@@ -22,11 +22,16 @@ type children []*node
 type node struct {
 	items    items
 	children children
+	parent   *node
 }
 
 //=============================================================================
 //= Methods
 //=============================================================================
+
+func split(items items) (left, right items, sep Item) {
+	return
+}
 
 // Insert inserts a new item into the BTree.
 func (b *BTree) Insert(item Item) {
@@ -57,10 +62,11 @@ func (b *BTree) Bulkload(items items) {
 // the BTree's order.
 // Note that by definition a non-leaf node with k children contains k-1 keys.
 // Hence the capacity of items is 1 less than that of children.
-func newNode(order int) *node {
+func newNode(order int, parent *node) *node {
 	return &node{
 		items:    make(items, 0, order-1),
 		children: make(children, 0, order),
+		parent:   parent,
 	}
 }
 
@@ -68,6 +74,6 @@ func newNode(order int) *node {
 func NewBTree(order int) *BTree {
 	return &BTree{
 		order: order,
-		root:  newNode(order),
+		root:  newNode(order, nil),
 	}
 }
