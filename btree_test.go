@@ -2,13 +2,84 @@ package btree
 
 import (
 	"fmt"
+	"math/rand"
 	"testing"
+	"time"
 )
 
-func walk(tree *BTree) {
+func TestInsert(t *testing.T) {
+	rand.Seed(time.Now().UnixNano())
+	numItems := 1000
+	massItems := make(map[int]*testItem, numItems)
+	dupItems := make(map[int]*testItem, numItems)
+	for i := 0; i < numItems; i++ {
+		massItems[i] = &testItem{i, i}
+		dupItems[i] = massItems[0]
+	}
+	insertTests := []struct {
+		items map[int]*testItem
+		order int
+	}{
+		// Many random unique items
+		{items: massItems, order: 3},
+		// Many random unique items with different order
+		{items: massItems, order: 6},
+		// Many random unique items with different order
+		{items: massItems, order: 11},
+		// Many random unique items with minimum order 2
+		{items: massItems, order: 2},
+		// Duplicate items
+		{items: dupItems, order: 5},
+	}
+	for _, ti := range insertTests {
+		b := NewBTree(ti.order)
+		i := 0
+		for _, item := range ti.items {
+			b.Insert(item)
+			i++
+
+			if !isValidBTree(b) {
+				walk(b.root)
+				t.Fatalf("After Insert: BTree is not valid after %dth insert of item %v\n", i+1, item)
+			}
+		}
+	}
+}
+
+func TestDelete(t *testing.T) {
 
 }
 
+func TestSearch(t *testing.T) {
+
+}
+
+func TestBulkload(t *testing.T) {
+
+}
+
+//=============================================================================
+//= Helpers
+//=============================================================================
+
+// A testItem is a simple type which implements the Item interface.
+// In all tests, B-Trees will contain testItems.
+type testItem struct {
+	key int
+	val int
+}
+
+func (ti *testItem) Less(other Item) bool {
+	o := other.(*testItem)
+	return ti.key < o.key
+}
+
+func (ti *testItem) String() string {
+	return fmt.Sprintf("(k: %d, v: %d),", ti.key, ti.val)
+}
+
+// atMostChildren recursively checks that very node in a BTree has at most
+// 'order' children (max = tree order).
 func atMostChildren(curr *node, max int) bool {
 	if len(curr.children) > max {
 		return false
@@ -21,12 +92,15 @@ func atMostChildren(curr *node, max int) bool {
 	return true
 }
 
+// atLeastChildren checks that every non-leaf AND non-root node has at least
+// order / 2 children (min = order / 2).
 func atLeastChildren(curr *node, min int) bool {
 	if len(curr.children) == 0 {
 		return true
 	}
 
-	if len(curr.children) < min {
+	// Check only non-leaf, non-root nodes.
+	if curr.parent != nil && len(curr.children) < min {
 		return false
 	}
 	for _, c := range curr.children {
@@ -38,6 +112,8 @@ func atLeastChildren(curr *node, min int) bool {
 
 }
 
+// atLeastChildrenRoot checks that the tree's root is either a leaf or has at
+// least 2 children.
 func atLeastChildrenRoot(root *node) bool {
 	if len(root.children) == 0 {
 		return true
@@ -48,6 +124,8 @@ func atLeastChildrenRoot(root *node) bool {
 	return false
 }
 
+// rightNumKeys checks that for non-leaf nodes, the number of children is
+// always 1 more than the number of items.
 func rightNumKeys(curr *node) bool {
 	if len(curr.children) == 0 {
 		return true
@@ -77,6 +155,10 @@ func allLeavesSameDepthRecurse(curr *node, currDepth, wantDepth int) bool {
 	return true
 }
 
+// allLeavesSameDepth checks that every leaf node in the tree has the same
+// depth.
+// It does this by first calculating the depth of the left most leaf, then
+// recursively checking that all other leaves have that same depth.
 func allLeavesSameDepth(root *node) bool {
 	expectedDepth := 0
 	curr := root
@@ -86,6 +168,52 @@ func allLeavesSameDepth(root *node) bool {
 	}
 
 	return allLeavesSameDepthRecurse(root, 0, expectedDepth)
+}
+
+// allBetweenBounds checks that the values in each subtree are correctly
+// bounded.
+func allBetweenBounds(curr *node) bool {
+	for i, c := range curr.children {
+		if i == 0 {
+			// Check that every item in leftmost child is less than
+			// leftmost item in current node.
+			// We break if len(curr.items) == 0, as that implies no
+			// comparisons are possible for current node's children.
+			if len(curr.items) == 0 {
+				break
+			}
+			for _, childItem := range c.items {
+				if !childItem.Less(curr.items[i]) {
+					return false
+				}
+			}
+		} else if i < len(curr.items) {
+			// For every child between 1 and last-1, check that every item
+			// of that child is in the open interval
+			// (curr.items[i-1], curr.items[i])
+			for _, childItem := range c.items {
+				if !(curr.items[i-1].Less(childItem) && childItem.Less(curr.items[i])) {
+					return false
+				}
+			}
+		} else if i == len(curr.items) {
+			// For final child, check that every element is
+			// strictly greater than last item.
+			for _, childItem := range c.items {
+				if !curr.items[i-1].Less(childItem) {
+					return false
+				}
+			}
+		}
+	}
+
+	for _, c := range curr.children {
+		if !allBetweenBounds(c) {
+			return false
+		}
+	}
+
+	return true
 }
 
 // isValidBTree checks that given tree satisfies the definition of a
@@ -118,23 +246,12 @@ func isValidBTree(tree *BTree) bool {
 		fmt.Printf("All leaves must have same depth\n")
 		return false
 	}
+	// 6. Values in all subtrees are properly bounded by items in subtree's
+	// root.
+	if !allBetweenBounds(tree.root) {
+		fmt.Printf("All subtrees must be properly bounded\n")
+		return false
+	}
 
 	return true
-}
-
-func TestInsert(t *testing.T) {
-	b := NewBTree(1)
-	fmt.Printf("%v\n", isValidBTree(b))
-}
-
-func TestDelete(t *testing.T) {
-
-}
-
-func TestSearch(t *testing.T) {
-
-}
-
-func TestBulkload(t *testing.T) {
-
 }
