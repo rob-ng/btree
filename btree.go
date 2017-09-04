@@ -52,6 +52,20 @@ func (its *items) insert(it Item) int {
 	return i
 }
 
+func (its *items) truncate(newLen int) {
+	for i := newLen; i < len(*its); i++ {
+		(*its)[i] = nil
+	}
+	*its = (*its)[:newLen]
+}
+
+func (chi *children) truncate(newLen int) {
+	for i := newLen; i < len(*chi); i++ {
+		(*chi)[i] = nil
+	}
+	*chi = (*chi)[:newLen]
+}
+
 // split inserts an item into a particular node.
 // After inserting the item into the node's 'items' field, the function
 // performs a series of checks / operations to ensure that the B-Tree remains
@@ -65,37 +79,28 @@ func (b *BTree) split(node *node, item Item) {
 
 	mid := len(node.items) / 2
 	midItem := node.items[mid]
-	var lc children
-	var rc children
+	rightNode := newNode(b.order, nil, nil, node.parent)
+	rightNode.items = append(rightNode.items, node.items[mid+1:]...)
+	node.items.truncate(mid)
 	if len(node.children) > 0 {
-		lc = append(lc, node.children[:mid+1]...)
-		rc = append(rc, node.children[mid+1:]...)
-	}
-	li := append(items(nil), node.items[:mid]...)
-	ri := append(items(nil), node.items[mid+1:]...)
-	leftNode := newNode(b.order, li, lc, node.parent)
-	rightNode := newNode(b.order, ri, rc, node.parent)
-	for _, c := range leftNode.children {
-		c.parent = leftNode
-	}
-	for _, c := range rightNode.children {
-		c.parent = rightNode
+		rightNode.children = append(rightNode.children, node.children[mid+1:]...)
+		node.children.truncate(mid + 1)
+		for _, c := range rightNode.children {
+			c.parent = rightNode
+		}
 	}
 
-	// If at root, create new root
 	if node.parent == nil {
-		newRoot := newNode(b.order, items{midItem}, children{leftNode, rightNode}, nil)
-		leftNode.parent = newRoot
+		newRoot := newNode(b.order, items{midItem}, children{node, rightNode}, nil)
+		node.parent = newRoot
 		rightNode.parent = newRoot
 		b.root = newRoot
 		return
 	}
 
-	// Overwrite reference to existing parent at index i.
 	i := node.parent.items.find(item)
 	node.parent.children = append(node.parent.children, nil)
 	copy(node.parent.children[i+1:], node.parent.children[i:])
-	node.parent.children[i] = leftNode
 	node.parent.children[i+1] = rightNode
 	b.split(node.parent, midItem)
 }
@@ -175,12 +180,6 @@ func (b *BTree) Bulkload(items items) {
 // Note that by definition a non-leaf node with k children contains k-1 keys.
 // Hence the capacity of items is 1 less than that of children.
 func newNode(order int, i items, c children, parent *node) *node {
-	if i == nil {
-		i = make(items, 0, order-1)
-	}
-	if c == nil {
-		c = make(children, 0, order)
-	}
 	return &node{
 		items:    i,
 		children: c,
