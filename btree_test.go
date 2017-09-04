@@ -51,6 +51,43 @@ func TestDelete(t *testing.T) {
 }
 
 func TestSearch(t *testing.T) {
+	rand.Seed(time.Now().UnixNano())
+	numItems := 10
+	massItems := make(map[int]*testItem, numItems)
+	for i := 0; i < numItems; i++ {
+		massItems[i] = &testItem{i, i}
+	}
+	cases := []struct {
+		items      map[int]*testItem
+		order      int
+		lookFor    []*testItem
+		shouldFind bool
+	}{
+		// Should be able to search empty tree
+		{items: map[int]*testItem{}, order: 4, lookFor: []*testItem{massItems[0]}, shouldFind: false},
+		// Should successfully find present node with particular order
+		{items: massItems, order: 5, lookFor: []*testItem{massItems[1], massItems[2], massItems[3]}, shouldFind: true},
+		// Should successfully find present node with different order
+		{items: massItems, order: 11, lookFor: []*testItem{massItems[1], massItems[2], massItems[3]}, shouldFind: true},
+		// Should successfully not find missing node
+		{items: massItems, order: 2, lookFor: []*testItem{{key: -9999, val: 0}}, shouldFind: false},
+	}
+
+	for _, c := range cases {
+		b := NewBTree(c.order)
+		for _, ti := range c.items {
+			b.Insert(ti)
+		}
+
+		for _, target := range c.lookFor {
+			_, err := b.Search(target)
+			if err != nil && c.shouldFind == true {
+				t.Errorf("Should have found: %v\n", target)
+			} else if err == nil && c.shouldFind == false {
+				t.Errorf("Should not have found: %v\n", target)
+			}
+		}
+	}
 
 }
 
