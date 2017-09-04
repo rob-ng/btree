@@ -106,25 +106,21 @@ func (b *BTree) split(node *node, item Item) {
 }
 
 // Insert inserts a new item into the BTree.
-// TODO: Handle case where item is equal to item alreay in tree
-// Try during for loop below.
 func (b *BTree) Insert(item Item) {
 	curr := b.root
-	i := curr.items.find(item)
-	if i-1 >= 0 && i-1 < len(curr.items) && !(item.Less(curr.items[i-1]) || curr.items[i-1].Less(item)) {
-		return
-	}
-	for len(curr.children) > 0 {
+	// Loop continues until reaching leaf or finding equal item.
+	for {
 		i := curr.items.find(item)
-		// If equal item is found, return without inserting.
-		// NOTE: find() returns the smallest index i such that
-		// items[i] < item.
-		// So if item is a duplicate, exisitng value will be at i-1.
-		if i-1 >= 0 && i-1 < len(curr.items) && !(item.Less(curr.items[i-1]) || curr.items[i-1].Less(item)) {
+
+		if curr.items.match(item, i-1) {
 			return
+		} else if i >= len(curr.children) || curr.children == nil {
+			break
 		}
+
 		curr = curr.children[i]
 	}
+
 	b.split(curr, item)
 }
 
