@@ -124,8 +124,30 @@ func (b *BTree) Insert(item Item) {
 	b.split(curr, item)
 }
 
+// search searches for an item in the tree and returns the node containing it.
+// It returns the node containing item and the index of item in the items
+// array.
+func (b *BTree) search(item Item) (*node, int) {
+	curr := b.root
+	for {
+		i := curr.items.find(item)
+		if curr.items.match(item, i-1) {
+			return curr, i - 1
+		} else if i >= len(curr.children) || curr.children == nil {
+			return nil, -1
+		}
+	}
+}
+
 // Delete deletes an item from the Btree.
 func (b *BTree) Delete(item Item) {
+	// 1. Search for node containing element
+	//    A. If element is in leaf, simply delete value from node.items
+	//    B. If element is in internal, we need to find replacement for
+	//    deleted item as separation value. To do this, we either find
+	//    largest element in left subtree or smallest element in right
+	//    subtree.
+	// 2. Replace the tree.
 
 }
 
