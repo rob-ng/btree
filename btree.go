@@ -59,6 +59,12 @@ func (its *items) truncate(newLen int) {
 	*its = (*its)[:newLen]
 }
 
+func (its *items) delete(index int) {
+	copy((*its)[index:], (*its)[index+1:])
+	(*its)[len(*its)-1] = nil
+	*its = (*its)[:len(*its)-1]
+}
+
 func (chi *children) truncate(newLen int) {
 	for i := newLen; i < len(*chi); i++ {
 		(*chi)[i] = nil
@@ -124,7 +130,7 @@ func (b *BTree) Insert(item Item) {
 	b.split(curr, item)
 }
 
-// search searches for an item in the tree and returns the node containing it.
+// search searches for an item in the tree.
 // It returns the node containing item and the index of item in the items
 // array.
 func (b *BTree) search(item Item) (*node, int) {
@@ -142,7 +148,14 @@ func (b *BTree) search(item Item) (*node, int) {
 // Delete deletes an item from the Btree.
 func (b *BTree) Delete(item Item) {
 	// 1. Search for node containing element
+	del, i := b.search(item)
+	if i == -1 {
+		return
+	}
 	//    A. If element is in leaf, simply delete value from node.items
+	if len(del.children) == 0 {
+		del.items.delete(i)
+	}
 	//    B. If element is in internal, we need to find replacement for
 	//    deleted item as separation value. To do this, we either find
 	//    largest element in left subtree or smallest element in right
