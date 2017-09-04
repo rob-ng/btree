@@ -142,7 +142,23 @@ func (b *BTree) search(item Item) (*node, int) {
 		} else if i >= len(curr.children) || curr.children == nil {
 			return nil, -1
 		}
+		curr = curr.children[i]
 	}
+}
+
+// max returns the rightmost node of a particular subtree.
+func (b *BTree) max(root *node) *node {
+	curr := root
+	for {
+		if curr.children == nil {
+			return curr
+		}
+		curr = curr.children[len(curr.children)-1]
+	}
+}
+
+func (b *BTree) rebalance(node *node) {
+	return
 }
 
 // Delete deletes an item from the Btree.
@@ -152,16 +168,26 @@ func (b *BTree) Delete(item Item) {
 	if i == -1 {
 		return
 	}
-	//    A. If element is in leaf, simply delete value from node.items
-	if len(del.children) == 0 {
+	var affected *node
+	if del.children == nil {
+		//    A. If element is in leaf, simply delete value from node.items
 		del.items.delete(i)
+		affected = del
+	} else {
+		//    B. If element is in internal, we need to find replacement for
+		//    deleted item as separation value. To do this, we either find
+		//    largest element in left subtree or smallest element in right
+		//    subtree.
+		// Replacement is max value of items less than deleted value.
+		// Recall that for any item at index i, children[i] gives left
+		// subtree.
+		maxNode := b.max(del.children[i])
+		del.items[i] = maxNode.items[len(maxNode.items)-1]
+		maxNode.items.delete(len(maxNode.items) - 1)
+		affected = maxNode
 	}
-	//    B. If element is in internal, we need to find replacement for
-	//    deleted item as separation value. To do this, we either find
-	//    largest element in left subtree or smallest element in right
-	//    subtree.
 	// 2. Replace the tree.
-
+	b.rebalance(affected)
 }
 
 // match checks if item and given index is equal to given item.
