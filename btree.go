@@ -133,15 +133,13 @@ func (b *BTree) Delete(item Item) {
 
 }
 
-// findEqual is a stricter version of find().
-// The function will only return a valid index if an exact match is found.
-// Otherwise the function returns -1.
-func (its *items) findEqual(item Item) int {
-	i := (*its).find(item)
-	if i-1 >= 0 && i-1 < len(*its) && !(item.Less((*its)[i-1]) || (*its)[i-1].Less(item)) {
-		return i - 1
+// match checks if item and given index is equal to given item.
+func (its *items) match(item Item, index int) bool {
+	if index >= 0 && index < len(*its) &&
+		!(item.Less((*its)[index]) || (*its)[index].Less(item)) {
+		return true
 	}
-	return -1
+	return false
 }
 
 // Search searches for an item in the Btree.
@@ -150,12 +148,10 @@ func (its *items) findEqual(item Item) int {
 func (b *BTree) Search(item Item) (*Item, error) {
 	curr := b.root
 	for {
-		if found := curr.items.findEqual(item); found != -1 {
-			return &curr.items[found], nil
-		}
-
 		i := curr.items.find(item)
-		if i >= len(curr.children) || curr.children == nil {
+		if curr.items.match(item, i-1) {
+			return &curr.items[i-1], nil
+		} else if i >= len(curr.children) || curr.children == nil {
 			break
 		}
 
