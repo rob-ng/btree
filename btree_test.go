@@ -47,7 +47,44 @@ func TestInsert(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
+	rand.Seed(time.Now().UnixNano())
+	numItems := 1000
+	massItems := make(map[int]*testItem, numItems)
+	for i := 0; i < numItems; i++ {
+		massItems[i] = &testItem{i, i}
+	}
+	emptyItems := make(map[int]*testItem)
+	cases := []struct {
+		items           map[int]*testItem
+		order           int
+		toDelete        *testItem
+		shouldAlterTree bool
+	}{
+		// Delete should work on empty tree
+		{items: emptyItems, order: 5, shouldAlterTree: false},
+		{items: emptyItems, order: 2, shouldAlterTree: false},
+		// Delete should work for item not in tree
+		{items: massItems, order: 3, toDelete: &testItem{key: -9999, val: 0}, shouldAlterTree: false},
+		// Delete should work for item in tree at internal node
+		{items: massItems, order: 8, toDelete: massItems[100], shouldAlterTree: true},
+		// Delete should work for item in tree at leaf
+	}
 
+	for _, c := range cases {
+		b := NewBTree(c.order)
+		for _, v := range c.items {
+			b.Insert(v)
+		}
+		b.Delete(c.toDelete)
+
+		if c.shouldAlterTree {
+			_, err := b.Search(c.toDelete)
+			if err == nil {
+				t.Errorf("Item should have been deleted from tree\n")
+			}
+		}
+
+	}
 }
 
 func TestSearch(t *testing.T) {
