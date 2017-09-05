@@ -47,12 +47,61 @@ func TestInsert(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
+	rand.Seed(time.Now().UnixNano())
+	numItems := 1000
+	massItems := make(map[int]*testItem, numItems)
+	for i := 0; i < numItems; i++ {
+		massItems[i] = &testItem{i, i}
+	}
+	emptyItems := make(map[int]*testItem)
+	dneItems := map[int]*testItem{0: &testItem{key: -999, val: 0}}
+	cases := []struct {
+		items           map[int]*testItem
+		order           int
+		toDelete        map[int]*testItem
+		shouldAlterTree bool
+	}{
+		// Delete should work on empty tree
+		{items: emptyItems, order: 5, toDelete: emptyItems, shouldAlterTree: false},
+		{items: emptyItems, order: 3, toDelete: emptyItems, shouldAlterTree: false},
+		// Delete should work for item not in tree
+		{items: massItems, order: 3, toDelete: dneItems, shouldAlterTree: false},
+		// Should fully delete trees of various orders
+		{items: massItems, order: 30, toDelete: massItems, shouldAlterTree: true},
+		{items: massItems, order: 8, toDelete: massItems, shouldAlterTree: true},
+		{items: massItems, order: 5, toDelete: massItems, shouldAlterTree: true},
+		{items: massItems, order: 3, toDelete: massItems, shouldAlterTree: true},
+	}
 
+	for _, c := range cases {
+		b := NewBTree(c.order)
+		for _, v := range c.items {
+			b.Insert(v)
+		}
+
+		for i, d := range c.toDelete {
+			_, presentBefore := b.Search(d)
+			b.Delete(d)
+
+			if c.shouldAlterTree {
+				_, presentAfter := b.Search(d)
+				if presentBefore == presentAfter {
+					t.Errorf("Item should have been deleted from tree\n")
+				}
+			}
+
+			if !isValidBTree(b) {
+				walk(b.root)
+				t.Fatalf("After Delete: BTree is not valid after %dth deletion. Item was %v\n", i, c.toDelete)
+			}
+		}
+
+	}
 }
 
 func TestSearch(t *testing.T) {
 	rand.Seed(time.Now().UnixNano())
-	numItems := 10
+	numItems := 1000
 	massItems := make(map[int]*testItem, numItems)
 	for i := 0; i < numItems; i++ {
 		massItems[i] = &testItem{i, i}

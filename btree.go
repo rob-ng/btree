@@ -3,6 +3,7 @@ package btree
 import (
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 )
 
@@ -59,11 +60,32 @@ func (its *items) truncate(newLen int) {
 	*its = (*its)[:newLen]
 }
 
+func (its *items) delete(index int) {
+	copy((*its)[index:], (*its)[index+1:])
+	(*its)[len(*its)-1] = nil
+	*its = (*its)[:len(*its)-1]
+}
+
+func (chi *children) delete(index int) {
+	copy((*chi)[index:], (*chi)[index+1:])
+	(*chi)[len(*chi)-1] = nil
+	*chi = (*chi)[:len(*chi)-1]
+}
+
 func (chi *children) truncate(newLen int) {
 	for i := newLen; i < len(*chi); i++ {
 		(*chi)[i] = nil
 	}
 	*chi = (*chi)[:newLen]
+}
+
+func (chi *children) indexOf(n *node) int {
+	for i, p := range *chi {
+		if p == n {
+			return i
+		}
+	}
+	return -1
 }
 
 // split inserts an item into a particular node.
@@ -124,9 +146,180 @@ func (b *BTree) Insert(item Item) {
 	b.split(curr, item)
 }
 
+// search searches for an item in the tree.
+// It returns the node containing item and the index of item in the items
+// array.
+func (b *BTree) search(item Item) (*node, int) {
+	curr := b.root
+	for {
+		i := curr.items.find(item)
+		if curr.items.match(item, i-1) {
+			return curr, i - 1
+		} else if i >= len(curr.children) || curr.children == nil {
+			return nil, -1
+		}
+		curr = curr.children[i]
+	}
+}
+
+// max returns the rightmost node of a particular subtree.
+func (b *BTree) max(root *node) *node {
+	curr := root
+	for {
+		if curr.children == nil {
+			return curr
+		}
+		curr = curr.children[len(curr.children)-1]
+	}
+}
+
+// leftSibling returns the left sibling of a particular node.
+// To have a left sibling, a node must be the [1, len(parent.children)]th child
+// of its parent.
+func (n *node) leftSibling() *node {
+	if n.parent == nil {
+		return nil
+	}
+	for i := 1; i < len(n.parent.children); i++ {
+		if n.parent.children[i] == n {
+			return n.parent.children[i-1]
+		}
+	}
+	return nil
+}
+
+// rightSibling returns the right sibling of a particular node.
+// To have a right sibling, a node must be the [0, len(parent.children)-1]th child
+// of its parent.
+func (n *node) rightSibling() *node {
+	if n.parent == nil {
+		return nil
+	}
+	for i := 0; i < len(n.parent.children)-1; i++ {
+		if n.parent.children[i] == n {
+			return n.parent.children[i+1]
+		}
+	}
+	return nil
+}
+
+// rebalance attempts to rebalance the tree around a given node.
+// To do this, the function
+func (b *BTree) rebalance(n *node, minItems int) {
+	// Root does not have same invariants as other nodes so it is ignored.
+	if n.parent == nil {
+		return
+	}
+
+	// Positions of separator items.
+	ptrIndex := n.parent.children.indexOf(n)
+	lSepPos, rSepPos := ptrIndex-1, ptrIndex
+	var sibling *node
+	// Left rotation
+	// NOTE: Important to also copy child nodes.
+	if sibling = n.rightSibling(); sibling != nil && len(sibling.items) > minItems {
+		n.items = append(n.items, n.parent.items[rSepPos])
+		n.parent.items[rSepPos] = sibling.items[0]
+		sibling.items.delete(0)
+		if len(sibling.children) > 0 {
+			sibling.children[0].parent = n
+			n.children = append(n.children, sibling.children[0])
+			sibling.children.delete(0)
+		}
+		return
+	}
+
+	// Right rotation
+	// NOTE: Important to also copy child nodes.
+	if sibling = n.leftSibling(); sibling != nil && len(sibling.items) > minItems {
+		n.items = append(items{n.parent.items[lSepPos]}, n.items...)
+		n.parent.items[lSepPos] = sibling.items[len(sibling.items)-1]
+		sibling.items.delete(len(sibling.items) - 1)
+		if len(sibling.children) > 0 {
+			lastChild := sibling.children[len(sibling.children)-1]
+			lastChild.parent = n
+			n.children = append(children{lastChild}, n.children...)
+			sibling.children.delete(len(sibling.children) - 1)
+		}
+		return
+	}
+
+	// Merge left node, separator, and right node, in that order.
+	// NOTE: Must update right's children with their new parent (left).
+	var left, right *node
+	var sepPos, rightPos int
+	if sibling = n.leftSibling(); sibling != nil {
+		left = sibling
+		right = n
+		sepPos = lSepPos
+		rightPos = ptrIndex
+	} else {
+		sibling = n.rightSibling()
+		left = n
+		right = sibling
+		sepPos = rSepPos
+		rightPos = ptrIndex + 1
+	}
+	left.items = append(left.items, n.parent.items[sepPos])
+	left.items = append(left.items, right.items...)
+	for _, c := range right.children {
+		c.parent = left
+	}
+	left.children = append(left.children, right.children...)
+	n.parent.items.delete(sepPos)
+	n.parent.children.delete(rightPos)
+
+	// Left becomes new root if parent is root and empty.
+	if n.parent.parent == nil && len(n.parent.items) == 0 {
+		right.parent = left
+		left.parent = nil
+		b.root = left
+		return
+	}
+
+	// If B-Tree invariants don't hold for parent, rebalance around parent.
+	minItems = int(math.Ceil(float64(b.order)/2.0)) - 1
+	if len(n.parent.items) < minItems { //|| len(n.parent.items) == 0 {
+		b.rebalance(n.parent, minItems)
+	}
+}
+
 // Delete deletes an item from the Btree.
 func (b *BTree) Delete(item Item) {
-
+	// 1. Search for node containing element
+	del, i := b.search(item)
+	if i == -1 {
+		return
+	}
+	var affected *node
+	if del.children == nil {
+		//    A. If element is in leaf, simply delete value from node.items
+		del.items.delete(i)
+		affected = del
+	} else {
+		//    B. If element is in internal, we need to find replacement for
+		//    deleted item as separation value. To do this, we either find
+		//    largest element in left subtree or smallest element in right
+		//    subtree.
+		// Replacement is max value of items less than deleted value.
+		// Recall that for any item at index i, children[i] gives left
+		// subtree.
+		maxNode := b.max(del.children[i])
+		if len(maxNode.items) > 0 {
+			del.items[i] = maxNode.items[len(maxNode.items)-1]
+			maxNode.items.delete(len(maxNode.items) - 1)
+		}
+		affected = maxNode
+	}
+	// 2. Replace the tree.
+	// NOTE: Because affected is a leaf, it is only considered unbalanced
+	// if it is empty and not the root.
+	if len(affected.items) == 0 && affected.parent != nil {
+		// As affected is a leaf node, its only requirement is that it
+		// not be empty.
+		minItems := 1
+		b.rebalance(affected, minItems)
+	}
 }
 
 // match checks if item and given index is equal to given item.
