@@ -67,6 +67,7 @@ func TestDelete(t *testing.T) {
 		// Delete should work for item not in tree
 		{items: massItems, order: 3, toDelete: dneItems, shouldAlterTree: false},
 		// Should fully delete trees of various orders
+		{items: massItems, order: 30, toDelete: massItems, shouldAlterTree: true},
 		{items: massItems, order: 8, toDelete: massItems, shouldAlterTree: true},
 		{items: massItems, order: 5, toDelete: massItems, shouldAlterTree: true},
 		{items: massItems, order: 3, toDelete: massItems, shouldAlterTree: true},

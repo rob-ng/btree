@@ -3,6 +3,7 @@ package btree
 import (
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 )
 
@@ -179,54 +180,38 @@ func (n *node) leftSibling() *node {
 	if n.parent == nil {
 		return nil
 	}
-	if len(n.parent.items) == 0 {
-		return nil
-	}
-	var siblingIndex int
-	for i, s := range n.parent.children {
-		if s == n {
-			siblingIndex = i - 1
-			break
+	for i := 1; i < len(n.parent.children); i++ {
+		if n.parent.children[i] == n {
+			return n.parent.children[i-1]
 		}
 	}
-	if siblingIndex < 0 {
-		return nil
-	}
-	return n.parent.children[siblingIndex]
+	return nil
 }
 
 // rightSibling returns the right sibling of a particular node.
-// To have a left sibling, a node must be the [0, len(parent.children)-1]th child
+// To have a right sibling, a node must be the [0, len(parent.children)-1]th child
 // of its parent.
 func (n *node) rightSibling() *node {
 	if n.parent == nil {
 		return nil
 	}
-	if len(n.parent.items) == 0 {
-		return nil
-	}
-	var siblingIndex int
-	for i, s := range n.parent.children {
-		if s == n {
-			siblingIndex = i + 1
-			break
+	for i := 0; i < len(n.parent.children)-1; i++ {
+		if n.parent.children[i] == n {
+			return n.parent.children[i+1]
 		}
 	}
-	if siblingIndex == len(n.parent.children) {
-		return nil
-	}
-	return n.parent.children[siblingIndex]
+	return nil
 }
 
 // rebalance attempts to rebalance the tree around a given node.
 // To do this, the function
-func (b *BTree) rebalance(n *node, minItems int) { //ptrIndex, minItems int) {
+func (b *BTree) rebalance(n *node, minItems int) {
 	// Root does not have same invariants as other nodes so it is ignored.
 	if n.parent == nil {
 		return
 	}
 
-	// Positions of separators items.
+	// Positions of separator items.
 	ptrIndex := n.parent.children.indexOf(n)
 	lSepPos, rSepPos := ptrIndex-1, ptrIndex
 	var sibling *node
@@ -259,7 +244,8 @@ func (b *BTree) rebalance(n *node, minItems int) { //ptrIndex, minItems int) {
 		return
 	}
 
-	// Merge left node, separator, and right node.
+	// Merge left node, separator, and right node, in that order.
+	// NOTE: Must update right's children with their new parent (left).
 	var left, right *node
 	var sepPos, rightPos int
 	if sibling = n.leftSibling(); sibling != nil {
@@ -292,13 +278,8 @@ func (b *BTree) rebalance(n *node, minItems int) { //ptrIndex, minItems int) {
 	}
 
 	// If B-Tree invariants don't hold for parent, rebalance around parent.
-	minItems = b.order / 2
-	if len(n.parent.children) < minItems || len(n.parent.items) == 0 || len(n.parent.items) < minItems-1 {
-		/*var parentSepIndex int
-		if n.parent != nil && n.parent.parent != nil {
-			parentSepIndex = n.parent.parent.children.indexOf(n.parent)
-		}
-		b.rebalance(n.parent, parentSepIndex, minItems)*/
+	minItems = int(math.Ceil(float64(b.order)/2.0)) - 1
+	if len(n.parent.items) < minItems { //|| len(n.parent.items) == 0 {
 		b.rebalance(n.parent, minItems)
 	}
 }
