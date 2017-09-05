@@ -53,8 +53,8 @@ func TestDelete(t *testing.T) {
 	for i := 0; i < numItems; i++ {
 		massItems[i] = &testItem{i, i}
 	}
-	//emptyItems := make(map[int]*testItem)
-	//dneItems := map[int]*testItem{0: &testItem{key: -999, val: 0}}
+	emptyItems := make(map[int]*testItem)
+	dneItems := map[int]*testItem{0: &testItem{key: -999, val: 0}}
 	cases := []struct {
 		items           map[int]*testItem
 		order           int
@@ -62,13 +62,14 @@ func TestDelete(t *testing.T) {
 		shouldAlterTree bool
 	}{
 		// Delete should work on empty tree
-		//{items: emptyItems, order: 5, toDelete: emptyItems, shouldAlterTree: false},
-		//{items: emptyItems, order: 2, toDelete: emptyItems, shouldAlterTree: false},
+		{items: emptyItems, order: 5, toDelete: emptyItems, shouldAlterTree: false},
+		{items: emptyItems, order: 3, toDelete: emptyItems, shouldAlterTree: false},
 		// Delete should work for item not in tree
-		//{items: massItems, order: 3, toDelete: dneItems, shouldAlterTree: false},
-		// Delete should work for item in tree at internal node
-		{items: massItems, order: 4, toDelete: massItems, shouldAlterTree: true},
-		// Delete should work for item in tree at leaf
+		{items: massItems, order: 3, toDelete: dneItems, shouldAlterTree: false},
+		// Should fully delete trees of various orders
+		{items: massItems, order: 8, toDelete: massItems, shouldAlterTree: true},
+		{items: massItems, order: 5, toDelete: massItems, shouldAlterTree: true},
+		{items: massItems, order: 3, toDelete: massItems, shouldAlterTree: true},
 	}
 
 	for _, c := range cases {
@@ -83,7 +84,6 @@ func TestDelete(t *testing.T) {
 
 			if c.shouldAlterTree {
 				_, presentAfter := b.Search(d)
-				//if err == nil {
 				if presentBefore == presentAfter {
 					t.Errorf("Item should have been deleted from tree\n")
 				}

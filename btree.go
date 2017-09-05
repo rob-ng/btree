@@ -218,13 +218,23 @@ func (n *node) rightSibling() *node {
 	return n.parent.children[siblingIndex]
 }
 
-func (b *BTree) rebalance(n *node, sepIndex, minItems int) {
+// rebalance attempts to rebalance the tree around a given node.
+// To do this, the function
+func (b *BTree) rebalance(n *node, minItems int) { //ptrIndex, minItems int) {
+	// Root does not have same invariants as other nodes so it is ignored.
+	if n.parent == nil {
+		return
+	}
+
+	// Positions of separators items.
+	ptrIndex := n.parent.children.indexOf(n)
+	lSepPos, rSepPos := ptrIndex-1, ptrIndex
 	var sibling *node
 	// Left rotation
 	// NOTE: Important to also copy child nodes.
 	if sibling = n.rightSibling(); sibling != nil && len(sibling.items) > minItems {
-		n.items = append(n.items, n.parent.items[sepIndex])
-		n.parent.items[sepIndex] = sibling.items[0]
+		n.items = append(n.items, n.parent.items[rSepPos])
+		n.parent.items[rSepPos] = sibling.items[0]
 		sibling.items.delete(0)
 		if len(sibling.children) > 0 {
 			sibling.children[0].parent = n
@@ -237,8 +247,8 @@ func (b *BTree) rebalance(n *node, sepIndex, minItems int) {
 	// Right rotation
 	// NOTE: Important to also copy child nodes.
 	if sibling = n.leftSibling(); sibling != nil && len(sibling.items) > minItems {
-		n.items = append(items{n.parent.items[sepIndex-1]}, n.items...)
-		n.parent.items[sepIndex-1] = sibling.items[len(sibling.items)-1]
+		n.items = append(items{n.parent.items[lSepPos]}, n.items...)
+		n.parent.items[lSepPos] = sibling.items[len(sibling.items)-1]
 		sibling.items.delete(len(sibling.items) - 1)
 		if len(sibling.children) > 0 {
 			lastChild := sibling.children[len(sibling.children)-1]
@@ -249,53 +259,47 @@ func (b *BTree) rebalance(n *node, sepIndex, minItems int) {
 		return
 	}
 
-	var left *node
-	var right *node
-
+	// Merge left node, separator, and right node.
+	var left, right *node
+	var sepPos, rightPos int
 	if sibling = n.leftSibling(); sibling != nil {
 		left = sibling
 		right = n
-		left.items = append(left.items, n.parent.items[sepIndex-1])
-		left.items = append(left.items, right.items...)
-		for _, c := range right.children {
-			c.parent = left
-		}
-		left.children = append(left.children, right.children...)
-		n.parent.items.delete(sepIndex - 1)
-		delIndex := n.parent.children.indexOf(right)
-		n.parent.children.delete(delIndex)
-		//n.parent.children.delete(sepIndex)
-	} else if sibling = n.rightSibling(); sibling != nil {
+		sepPos = lSepPos
+		rightPos = ptrIndex
+	} else {
+		sibling = n.rightSibling()
 		left = n
 		right = sibling
-		left.items = append(left.items, n.parent.items[sepIndex])
-		left.items = append(left.items, right.items...)
-		for _, c := range right.children {
-			c.parent = left
-		}
-		left.children = append(left.children, right.children...)
-		n.parent.items.delete(sepIndex)
-		delIndex := n.parent.children.indexOf(right)
-		n.parent.children.delete(delIndex)
-	} else {
-		// node is root. should just leave empty root alone.
-		return
+		sepPos = rSepPos
+		rightPos = ptrIndex + 1
 	}
+	left.items = append(left.items, n.parent.items[sepPos])
+	left.items = append(left.items, right.items...)
+	for _, c := range right.children {
+		c.parent = left
+	}
+	left.children = append(left.children, right.children...)
+	n.parent.items.delete(sepPos)
+	n.parent.children.delete(rightPos)
 
+	// Left becomes new root if parent is root and empty.
 	if n.parent.parent == nil && len(n.parent.items) == 0 {
 		right.parent = left
-		b.root = left
 		left.parent = nil
+		b.root = left
 		return
 	}
 
-	minChildren := b.order / 2
-	if len(n.parent.items) == b.order {
-		fmt.Printf("NUM PARENT ITEMS EQUALS ORDER!\n")
-	}
-	if len(n.parent.children) < minChildren {
-		parentSepIndex := n.parent.parent.children.indexOf(n.parent)
-		b.rebalance(n.parent, parentSepIndex, minChildren)
+	// If B-Tree invariants don't hold for parent, rebalance around parent.
+	minItems = b.order / 2
+	if len(n.parent.children) < minItems || len(n.parent.items) == 0 || len(n.parent.items) < minItems-1 {
+		/*var parentSepIndex int
+		if n.parent != nil && n.parent.parent != nil {
+			parentSepIndex = n.parent.parent.children.indexOf(n.parent)
+		}
+		b.rebalance(n.parent, parentSepIndex, minItems)*/
+		b.rebalance(n.parent, minItems)
 	}
 }
 
@@ -320,20 +324,25 @@ func (b *BTree) Delete(item Item) {
 		// Recall that for any item at index i, children[i] gives left
 		// subtree.
 		maxNode := b.max(del.children[i])
-		del.items[i] = maxNode.items[len(maxNode.items)-1]
-		maxNode.items.delete(len(maxNode.items) - 1)
+		if len(maxNode.items) > 0 {
+			del.items[i] = maxNode.items[len(maxNode.items)-1]
+			maxNode.items.delete(len(maxNode.items) - 1)
+		}
 		affected = maxNode
 	}
 	// 2. Replace the tree.
 	// NOTE: Because affected is a leaf, it is only considered unbalanced
 	// if it is empty and not the root.
 	if len(affected.items) == 0 && affected.parent != nil {
+		// As affected is a leaf node, its only requirement is that it
+		// not be empty.
 		minItems := 1
 		// SEP INDEX AND i DO DIFFER!
-		sepIndex := affected.parent.children.indexOf(affected)
-		if sepIndex >= 0 {
-			b.rebalance(affected, sepIndex, minItems)
-		}
+		//sepIndex := affected.parent.children.indexOf(affected)
+		//if sepIndex >= 0 {
+		//b.rebalance(affected, sepIndex, minItems)
+		//}
+		b.rebalance(affected, minItems)
 	}
 }
 
