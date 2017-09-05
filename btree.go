@@ -81,7 +81,6 @@ func (chi *children) truncate(newLen int) {
 func (chi *children) indexOf(n *node) int {
 	for i, p := range *chi {
 		if p == n {
-			fmt.Printf("FOUND %d\n", i)
 			return i
 		}
 	}
@@ -194,13 +193,6 @@ func (n *node) leftSibling() *node {
 		return nil
 	}
 	return n.parent.children[siblingIndex]
-	/*it := n.items[0]
-	i := n.parent.items.find(it)
-	if i == 0 {
-		return nil
-	}
-	return n.parent.children[i-1]*/
-
 }
 
 // rightSibling returns the right sibling of a particular node.
@@ -213,11 +205,6 @@ func (n *node) rightSibling() *node {
 	if len(n.parent.items) == 0 {
 		return nil
 	}
-	/*it := n.items[0]
-	i := n.parent.items.find(it)
-	if i == len(n.parent.items) {
-		return nil
-	}*/
 	var siblingIndex int
 	for i, s := range n.parent.children {
 		if s == n {
@@ -232,15 +219,10 @@ func (n *node) rightSibling() *node {
 }
 
 func (b *BTree) rebalance(n *node, sepIndex, minItems int) {
-	fmt.Printf("AT REBALANCE\n")
-	walk(b.root)
 	var sibling *node
-	//fmt.Printf("SEP INDEX IS: %d\n", sepIndex)
+	// Left rotation
+	// NOTE: Important to also copy child nodes.
 	if sibling = n.rightSibling(); sibling != nil && len(sibling.items) > minItems {
-		//("RIGHT SIBLING EXISTS AND CAN SHARE WITH NODE\n")
-		// Copy separator. Recall that the index of an item is also the
-		// index of its left subtree (left subtree == children[i]).
-		//("APPENDING SEPARATOR FROM PARENT: %v\n", n.parent.items[sepIndex])
 		n.items = append(n.items, n.parent.items[sepIndex])
 		n.parent.items[sepIndex] = sibling.items[0]
 		sibling.items.delete(0)
@@ -249,22 +231,13 @@ func (b *BTree) rebalance(n *node, sepIndex, minItems int) {
 			n.children = append(n.children, sibling.children[0])
 			sibling.children.delete(0)
 		}
-		// Replace separator in parent with first element of right
-		// sibling.
-		//("REPLACING SEPARATOR WITH LAST ITEM FROM SIBLING: %v\n", sibling.items[0])
-		fmt.Printf("RIGHT SIBLING HAD EXTRA\n")
-		for _, c := range n.children {
-			c.parent = n
-		}
-		walk(b.root)
 		return
 	}
 
+	// Right rotation
+	// NOTE: Important to also copy child nodes.
 	if sibling = n.leftSibling(); sibling != nil && len(sibling.items) > minItems {
-		//("LEFT SIBLING EXISTS AND CAN SHARE WITH NODE\n")
-		//("PREPENDING SEPARATOR FROM PARENT: %v\n", n.parent.items[sepIndex-1])
 		n.items = append(items{n.parent.items[sepIndex-1]}, n.items...)
-		//("REPLACING SEPARATOR WITH LAST ITEM FROM SIBLING: %v\n", sibling.items[len(sibling.items)-1])
 		n.parent.items[sepIndex-1] = sibling.items[len(sibling.items)-1]
 		sibling.items.delete(len(sibling.items) - 1)
 		if len(sibling.children) > 0 {
@@ -273,34 +246,17 @@ func (b *BTree) rebalance(n *node, sepIndex, minItems int) {
 			n.children = append(children{lastChild}, n.children...)
 			sibling.children.delete(len(sibling.children) - 1)
 		}
-		fmt.Printf("LEFT SIBLING HAD EXTRA\n")
-		for _, c := range n.children {
-			c.parent = n
-		}
-		walk(b.root)
 		return
 	}
 
-	fmt.Printf("SIBLINGS COULD NOT SHARE\n")
-
-	var parentSepIndex int
-	if n.parent != nil && n.parent.parent != nil {
-		//parentSepIndex = n.parent.parent.items.find(n.parent.items[0])
-		parentSepIndex = n.parent.parent.children.indexOf(n.parent)
-		//("PARENT SEP INDEX IS: %d\n", parentSepIndex)
-	}
 	var left *node
 	var right *node
 
-	//("SIBLINGS ARE: left %v, right %v\n", n.leftSibling(), n.rightSibling())
 	if sibling = n.leftSibling(); sibling != nil {
 		left = sibling
 		right = n
-		//("APPENDING SEPARATOR FROM PARENT: %v\n", n.parent.items[sepIndex-1])
-		fmt.Printf("MERGING WITH LEFT SIBLING! SEPARTOR IS: %v\n", n.parent.items[sepIndex-1])
 		left.items = append(left.items, n.parent.items[sepIndex-1])
 		left.items = append(left.items, right.items...)
-		fmt.Printf("LEFT ITEMS IS: %v\n", left.items)
 		for _, c := range right.children {
 			c.parent = left
 		}
@@ -309,14 +265,11 @@ func (b *BTree) rebalance(n *node, sepIndex, minItems int) {
 		delIndex := n.parent.children.indexOf(right)
 		n.parent.children.delete(delIndex)
 		//n.parent.children.delete(sepIndex)
-		fmt.Printf("LEFT ITEMS AFTER DELETE: %v\n", left.items)
 	} else if sibling = n.rightSibling(); sibling != nil {
 		left = n
 		right = sibling
-		fmt.Printf("MERGING WITH RIGHT SIBLING! SEPARTOR IS: %v\n", n.parent.items[sepIndex])
 		left.items = append(left.items, n.parent.items[sepIndex])
 		left.items = append(left.items, right.items...)
-		fmt.Printf("LEFT ITEMS IS: %v\n", left.items)
 		for _, c := range right.children {
 			c.parent = left
 		}
@@ -324,44 +277,25 @@ func (b *BTree) rebalance(n *node, sepIndex, minItems int) {
 		n.parent.items.delete(sepIndex)
 		delIndex := n.parent.children.indexOf(right)
 		n.parent.children.delete(delIndex)
-		fmt.Printf("LEFT ITEMS AFTER DELETE: %v\n", left.items)
 	} else {
-		fmt.Printf("NODE IS ROOT SO STOPPING\n")
 		// node is root. should just leave empty root alone.
-		//("NODE IS ROOT! RETURNING...\n")
 		return
 	}
 
-	for _, c := range left.children {
-		c.parent = left
-	}
-
-	/*left.items = append(left.items, n.parent.items[sepIndex])
-	left.items = append(left.items, right.items...)*/
-	// Remove separator
-	//n.parent.items.delete(sepIndex)
-	// Remove right child pointer
-	//n.parent.children.delete(sepIndex + 1)
-
 	if n.parent.parent == nil && len(n.parent.items) == 0 {
-		fmt.Printf("PARENT WAS ROOT. REPLACING WITH LEFT\n")
 		right.parent = left
 		b.root = left
 		left.parent = nil
 		return
 	}
 
-	minItems = b.order / 2
+	minChildren := b.order / 2
 	if len(n.parent.items) == b.order {
 		fmt.Printf("NUM PARENT ITEMS EQUALS ORDER!\n")
 	}
-	if len(n.parent.children) < minItems {
-		fmt.Printf("CALLING REBALANCE AGAIN\n")
-		b.rebalance(n.parent, parentSepIndex, minItems)
-	} else if len(n.parent.items) < minItems-1 {
-		fmt.Printf("RIGHT NUM CHILDREN, WRONG NUM ITEMS\n")
-		fmt.Printf("CALLING REBALANCE AGAIN\n")
-		b.rebalance(n.parent, parentSepIndex, minItems)
+	if len(n.parent.children) < minChildren {
+		parentSepIndex := n.parent.parent.children.indexOf(n.parent)
+		b.rebalance(n.parent, parentSepIndex, minChildren)
 	}
 }
 
@@ -386,22 +320,17 @@ func (b *BTree) Delete(item Item) {
 		// Recall that for any item at index i, children[i] gives left
 		// subtree.
 		maxNode := b.max(del.children[i])
-		fmt.Printf("MAX NODE IS: %v\n", maxNode)
 		del.items[i] = maxNode.items[len(maxNode.items)-1]
 		maxNode.items.delete(len(maxNode.items) - 1)
 		affected = maxNode
 	}
 	// 2. Replace the tree.
-	// NOTE: We only use rebalance if the affected node has less than
-	// minimum number of elements (always order / 2).
-	// As root has no minimum number of elements, we can ignore affected if
-	// it is root.
+	// NOTE: Because affected is a leaf, it is only considered unbalanced
+	// if it is empty and not the root.
 	if len(affected.items) == 0 && affected.parent != nil {
-		fmt.Printf("DELETED INDEX: %d\n", i)
-		fmt.Printf("REBALANCING\n")
 		minItems := 1
+		// SEP INDEX AND i DO DIFFER!
 		sepIndex := affected.parent.children.indexOf(affected)
-		fmt.Printf("New sep index: %d\n", sepIndex)
 		if sepIndex >= 0 {
 			b.rebalance(affected, sepIndex, minItems)
 		}

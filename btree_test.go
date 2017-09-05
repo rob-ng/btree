@@ -77,18 +77,9 @@ func TestDelete(t *testing.T) {
 			b.Insert(v)
 		}
 
-		fmt.Printf("INITIAL TREE:\n")
-		walk(b.root)
-		fmt.Println()
-		fmt.Println()
-
 		for i, d := range c.toDelete {
-			fmt.Println()
-			fmt.Printf("\n%d: DELETING %v...\n", i, d)
 			_, presentBefore := b.Search(d)
 			b.Delete(d)
-			fmt.Printf("\nAFTER DELETE:\n")
-			walk(b.root)
 
 			if c.shouldAlterTree {
 				_, presentAfter := b.Search(d)
