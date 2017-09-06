@@ -136,7 +136,7 @@ func (b *BTree) Insert(item Item) {
 
 		if curr.items.match(item, i-1) {
 			return
-		} else if i >= len(curr.children) || curr.children == nil {
+		} else if i >= len(curr.children) {
 			break
 		}
 
@@ -155,7 +155,7 @@ func (b *BTree) search(item Item) (*node, int) {
 		i := curr.items.find(item)
 		if curr.items.match(item, i-1) {
 			return curr, i - 1
-		} else if i >= len(curr.children) || curr.children == nil {
+		} else if i >= len(curr.children) {
 			return nil, -1
 		}
 		curr = curr.children[i]
@@ -166,7 +166,7 @@ func (b *BTree) search(item Item) (*node, int) {
 func (b *BTree) max(root *node) *node {
 	curr := root
 	for {
-		if curr.children == nil {
+		if len(curr.children) == 0 {
 			return curr
 		}
 		curr = curr.children[len(curr.children)-1]
@@ -292,7 +292,7 @@ func (b *BTree) Delete(item Item) {
 		return
 	}
 	var affected *node
-	if del.children == nil {
+	if len(del.children) == 0 {
 		//    A. If element is in leaf, simply delete value from node.items
 		del.items.delete(i)
 		affected = del
@@ -340,7 +340,7 @@ func (b *BTree) Search(item Item) (*Item, error) {
 		i := curr.items.find(item)
 		if curr.items.match(item, i-1) {
 			return &curr.items[i-1], nil
-		} else if i >= len(curr.children) || curr.children == nil {
+		} else if i >= len(curr.children) {
 			break
 		}
 
