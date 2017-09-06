@@ -102,19 +102,11 @@ func (b *BTree) Delete(item Item) {
 // If the item is found, the method returns a pointer to it.
 // Otherwise, the function returns nil and an error indicating failure.
 func (b *BTree) Search(item Item) (*Item, error) {
-	curr := b.root
-	for {
-		i := curr.items.find(item)
-		if curr.items.match(item, i-1) {
-			return &curr.items[i-1], nil
-		} else if i >= len(curr.children) {
-			break
-		}
-
-		curr = curr.children[i]
+	container, index := b.search(item)
+	if index == -1 {
+		return nil, errors.New("item not found in BTree")
 	}
-
-	return nil, errors.New("item not found in BTree")
+	return &container.items[index], nil
 }
 
 // Bulkload initializes a BTree using an array of Items.
