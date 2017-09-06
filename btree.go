@@ -173,34 +173,17 @@ func (b *BTree) max(root *node) *node {
 	}
 }
 
-// leftSibling returns the left sibling of a particular node.
-// To have a left sibling, a node must be the [1, len(parent.children)]th child
-// of its parent.
-func (n *node) leftSibling() *node {
+// nthChildOfParent returns the index of the child in n.parent which points to
+// n.
+// NOTE: Because find() uses binary search, we defer to it when possible.
+func (n *node) nthChildOfParent() int {
 	if n.parent == nil {
-		return nil
+		return -1
 	}
-	for i := 1; i < len(n.parent.children); i++ {
-		if n.parent.children[i] == n {
-			return n.parent.children[i-1]
-		}
+	if len(n.items) == 0 {
+		return n.parent.children.indexOf(n)
 	}
-	return nil
-}
-
-// rightSibling returns the right sibling of a particular node.
-// To have a right sibling, a node must be the [0, len(parent.children)-1]th child
-// of its parent.
-func (n *node) rightSibling() *node {
-	if n.parent == nil {
-		return nil
-	}
-	for i := 0; i < len(n.parent.children)-1; i++ {
-		if n.parent.children[i] == n {
-			return n.parent.children[i+1]
-		}
-	}
-	return nil
+	return n.parent.items.find(n.items[0])
 }
 
 // rebalance attempts to rebalance the tree around a given node.
@@ -212,12 +195,18 @@ func (b *BTree) rebalance(n *node, minItems int) {
 	}
 
 	// Positions of separator items.
-	ptrIndex := n.parent.children.indexOf(n)
+	ptrIndex := n.nthChildOfParent()
 	lSepPos, rSepPos := ptrIndex-1, ptrIndex
-	var sibling *node
+	var leftSib, rightSib, sibling *node
+	if ptrIndex > 0 {
+		leftSib = n.parent.children[ptrIndex-1]
+	}
+	if ptrIndex < len(n.parent.children)-1 {
+		rightSib = n.parent.children[ptrIndex+1]
+	}
 	// Left rotation
 	// NOTE: Important to also copy child nodes.
-	if sibling = n.rightSibling(); sibling != nil && len(sibling.items) > minItems {
+	if sibling = rightSib; sibling != nil && len(sibling.items) > minItems {
 		n.items = append(n.items, n.parent.items[rSepPos])
 		n.parent.items[rSepPos] = sibling.items[0]
 		sibling.items.delete(0)
@@ -231,7 +220,7 @@ func (b *BTree) rebalance(n *node, minItems int) {
 
 	// Right rotation
 	// NOTE: Important to also copy child nodes.
-	if sibling = n.leftSibling(); sibling != nil && len(sibling.items) > minItems {
+	if sibling = leftSib; sibling != nil && len(sibling.items) > minItems {
 		n.items = append(items{n.parent.items[lSepPos]}, n.items...)
 		n.parent.items[lSepPos] = sibling.items[len(sibling.items)-1]
 		sibling.items.delete(len(sibling.items) - 1)
@@ -248,13 +237,13 @@ func (b *BTree) rebalance(n *node, minItems int) {
 	// NOTE: Must update right's children with their new parent (left).
 	var left, right *node
 	var sepPos, rightPos int
-	if sibling = n.leftSibling(); sibling != nil {
+	if sibling = leftSib; sibling != nil {
 		left = sibling
 		right = n
 		sepPos = lSepPos
 		rightPos = ptrIndex
 	} else {
-		sibling = n.rightSibling()
+		sibling = rightSib
 		left = n
 		right = sibling
 		sepPos = rSepPos
@@ -279,7 +268,7 @@ func (b *BTree) rebalance(n *node, minItems int) {
 
 	// If B-Tree invariants don't hold for parent, rebalance around parent.
 	minItems = int(math.Ceil(float64(b.order)/2.0)) - 1
-	if len(n.parent.items) < minItems { //|| len(n.parent.items) == 0 {
+	if len(n.parent.items) < minItems {
 		b.rebalance(n.parent, minItems)
 	}
 }
