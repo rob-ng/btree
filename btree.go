@@ -23,6 +23,12 @@ type Item interface {
 	Less(other Item) bool
 }
 
+// An Iterator is a bidirectional, stateful iterator for BTrees.
+type Iterator struct {
+	next *node
+	prev *node
+}
+
 type items []Item
 
 type children []*node
@@ -112,6 +118,16 @@ func (b *BTree) Search(item Item) (*Item, error) {
 // Bulkload initializes a BTree using an array of Items.
 func (b *BTree) Bulkload(items items) {
 
+}
+
+// HasNext determines if the iterator can be iterated forward.
+func (bi *Iterator) HasNext() bool {
+	return bi.next != nil
+}
+
+// HasPrev determines if the iterator can be iterated backward.
+func (bi *Iterator) HasPrev() bool {
+	return bi.prev != nil
 }
 
 // split inserts an item into a particular node.
