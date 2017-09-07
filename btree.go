@@ -155,6 +155,10 @@ func (bi *Iterator) HasNext() bool {
 }
 
 // Next iterates the iterator and returns its new value.
+//
+// BUG: The call to Next() which should set bi.curr = nil (so that subsequent
+// HasNext() will be false) doesn't appear to be working. Error gets returned
+// but curr isn't set.
 func (bi *Iterator) Next() (Item, error) {
 	if !bi.HasNext() {
 		return nil, errors.New("Iterator does not have next")
@@ -179,6 +183,7 @@ func (bi *Iterator) Next() (Item, error) {
 			}
 			curr = curr.parent
 			if curr == nil {
+				bi.curr = curr
 				return nil, errors.New("Iterator does not have next")
 			}
 			if 0 <= bi.itemIndex && bi.itemIndex < len(curr.items) {
@@ -470,6 +475,44 @@ func Bulkload(order int, items items) *BTree {
 
 	}
 	return b
+}
+
+// Merge merges two BTrees into a single BTree which it returns.
+func Merge(a, b *BTree) (*BTree, error) {
+	if a.order != b.order {
+		return nil, errors.New("Merged BTrees must have same order")
+	}
+
+	aIter := a.NewIterator()
+	bIter := b.NewIterator()
+	var oldA, oldB Item
+	var merged []Item
+	for {
+		if !aIter.HasNext() && !bIter.HasNext() {
+			break
+		}
+
+		var aNext, bNext Item
+		if aNext = oldA; aNext == nil && aIter.HasNext() {
+			aNext, _ = aIter.Next()
+		}
+		if bNext = oldB; bNext == nil && bIter.HasNext() {
+			bNext, _ = bIter.Next()
+		}
+		if aNext != nil && (bNext == nil || aNext.Less(bNext)) {
+			merged = append(merged, aNext)
+			oldA = nil
+			oldB = bNext
+		} else if bNext != nil && (aNext == nil || bNext.Less(aNext)) {
+			merged = append(merged, bNext)
+			oldA = aNext
+			oldB = nil
+		}
+	}
+
+	mt := Bulkload(b.order, merged)
+
+	return mt, nil
 }
 
 // newNode returns a new node.
