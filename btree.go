@@ -9,6 +9,16 @@ import (
 )
 
 //=============================================================================
+//= Variables and Constants
+//=============================================================================
+
+// Direction values for Iterator
+const (
+	forward = 1
+	reverse = -1
+)
+
+//=============================================================================
 //= Types
 //=============================================================================
 
@@ -23,12 +33,14 @@ type Item interface {
 	Less(other Item) bool
 }
 
-// An Iterator is a bidirectional, stateful iterator for BTrees.
+// An Iterator is a stateful iterator for BTrees.
+//
+// Iterators move either in-order or reverse in-order.
 type Iterator struct {
 	itemIndex  int
 	childIndex int
-	next       *node
-	prev       *node
+	dir        int
+	curr       *node
 }
 
 type items []Item
@@ -127,72 +139,83 @@ func (b *BTree) NewIterator() *Iterator {
 	return &Iterator{
 		itemIndex:  0,
 		childIndex: 0,
-		next:       b.root,
-		prev:       nil,
+		curr:       b.root,
+		dir:        forward,
 	}
 }
 
-// HasNext determines if the iterator can be iterated forward.
+// NewReverseIterator returns a new reverse iterator for the BTree.
+func (b *BTree) NewReverseIterator() *Iterator {
+	return &Iterator{
+		itemIndex:  len(b.root.items) - 1,
+		childIndex: len(b.root.children) - 1,
+		curr:       b.root,
+		dir:        reverse,
+	}
+}
+
+// HasNext determines if iterator can iterate.
 func (bi *Iterator) HasNext() bool {
-	return bi.next != nil
+	return bi.curr != nil
 }
 
-// HasPrev determines if the iterator can be iterated backward.
-func (bi *Iterator) HasPrev() bool {
-	return bi.prev != nil
-}
-
-// Next moves the iterator forward one iteration.
+// Next iterates the iterator and returns its new value.
 func (bi *Iterator) Next() (Item, error) {
 	if !bi.HasNext() {
-		return nil, errors.New("Iterator cannot move forward")
+		return nil, errors.New("Iterator does not have next")
 	}
-	curr := bi.next
-	bi.prev = bi.next
-	// 1. At minimum leaf node
+
+	curr := bi.curr
+	// 1. At leaf node
 	if len(curr.children) == 0 {
 		// A. More items in current node
-		if bi.itemIndex < len(curr.items) {
+		if 0 <= bi.itemIndex && bi.itemIndex < len(curr.items) {
 			nextItem := curr.items[bi.itemIndex]
-			bi.itemIndex++
+			bi.itemIndex += bi.dir
 			return nextItem, nil
 		}
-		// B. No more items in current node
-		// Return to ancestors until find one with available items.
-		// If reached root.parent, iteration has completed.
+		// B. No more items
 		for {
 			bi.itemIndex = curr.nthChildOfParent()
 			bi.childIndex = bi.itemIndex + 1
-			curr = bi.next.parent
-			if curr == nil {
-				return nil, errors.New("Iterator cannot move forward")
+			if bi.dir == reverse {
+				bi.itemIndex--
+				bi.childIndex = bi.itemIndex
 			}
-			bi.next = curr
-			if bi.itemIndex < len(curr.items) {
+			curr = curr.parent
+			if curr == nil {
+				return nil, errors.New("Iterator does not have next")
+			}
+			if 0 <= bi.itemIndex && bi.itemIndex < len(curr.items) {
+				bi.curr = curr
 				nextItem := curr.items[bi.itemIndex]
-				bi.itemIndex = 0
 				return nextItem, nil
 			}
+
 		}
 
 	}
 
 	// 2. At internal node
-	// Follow child index then follow leftmost children until a leaf is
-	// reached.
 	for {
 		curr = curr.children[bi.childIndex]
-		bi.childIndex = 0
-		bi.itemIndex = 0
 		for {
 			if len(curr.children) == 0 {
 				break
 			}
-			curr = curr.children[0]
+			indexToFollow := 0
+			if bi.dir == reverse {
+				indexToFollow += len(curr.children) - 1
+			}
+			curr = curr.children[indexToFollow]
 		}
-		bi.next = curr
+		bi.curr = curr
+		bi.itemIndex = 0
+		if bi.dir == reverse {
+			bi.itemIndex += len(curr.items) - 1
+		}
 		nextItem := curr.items[bi.itemIndex]
-		bi.itemIndex++
+		bi.itemIndex += bi.dir
 		return nextItem, nil
 	}
 }

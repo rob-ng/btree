@@ -140,7 +140,7 @@ func TestSearch(t *testing.T) {
 
 }
 
-func TestIterator(t *testing.T) {
+func TestIteratorNext(t *testing.T) {
 	rand.Seed(time.Now().UnixNano())
 	numItems := 1000
 	massItems := make(map[int]*testItem, numItems)
@@ -159,15 +159,39 @@ func TestIterator(t *testing.T) {
 		for _, v := range c.items {
 			b.Insert(v)
 		}
-		walk(b.root)
 		iter := b.NewIterator()
 
 		for i := 0; i < len(c.items); i++ {
-			next, _ := iter.Next()
-			fmt.Printf("next: %v\n", next)
+			iter.Next()
 		}
 	}
+}
 
+func TestIteratorReverseNext(t *testing.T) {
+	rand.Seed(time.Now().UnixNano())
+	numItems := 1000
+	massItems := make(map[int]*testItem, numItems)
+	for i := 0; i < numItems; i++ {
+		massItems[i] = &testItem{i, i}
+	}
+	cases := []struct {
+		items map[int]*testItem
+		order int
+	}{
+		{items: massItems, order: 3},
+	}
+
+	for _, c := range cases {
+		b := NewBTree(c.order)
+		for _, v := range c.items {
+			b.Insert(v)
+		}
+		iter := b.NewReverseIterator()
+
+		for i := 0; i < len(c.items); i++ {
+			iter.Next()
+		}
+	}
 }
 
 func TestBulkload(t *testing.T) {
@@ -198,7 +222,13 @@ func BenchmarkIterator(b *testing.B) {
 		iter := bt.NewIterator()
 		iterateThrough(iter)
 	}
+}
 
+func BenchmarkIteratorReverse(b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		iter := bt.NewReverseIterator()
+		iterateThrough(iter)
+	}
 }
 
 func iterateThrough(iter *Iterator) {
