@@ -25,8 +25,10 @@ type Item interface {
 
 // An Iterator is a bidirectional, stateful iterator for BTrees.
 type Iterator struct {
-	next *node
-	prev *node
+	itemIndex  int
+	childIndex int
+	next       *node
+	prev       *node
 }
 
 type items []Item
@@ -120,6 +122,16 @@ func (b *BTree) Bulkload(items items) {
 
 }
 
+// NewIterator returns a new iterator for the BTree.
+func (b *BTree) NewIterator() *Iterator {
+	return &Iterator{
+		itemIndex:  0,
+		childIndex: 0,
+		next:       b.root,
+		prev:       nil,
+	}
+}
+
 // HasNext determines if the iterator can be iterated forward.
 func (bi *Iterator) HasNext() bool {
 	return bi.next != nil
@@ -128,6 +140,61 @@ func (bi *Iterator) HasNext() bool {
 // HasPrev determines if the iterator can be iterated backward.
 func (bi *Iterator) HasPrev() bool {
 	return bi.prev != nil
+}
+
+// Next moves the iterator forward one iteration.
+func (bi *Iterator) Next() (Item, error) {
+	if !bi.HasNext() {
+		return nil, errors.New("Iterator cannot move forward")
+	}
+	curr := bi.next
+	bi.prev = bi.next
+	// 1. At minimum leaf node
+	if len(curr.children) == 0 {
+		// A. More items in current node
+		if bi.itemIndex < len(curr.items) {
+			nextItem := curr.items[bi.itemIndex]
+			bi.itemIndex++
+			return nextItem, nil
+		}
+		// B. No more items in current node
+		// Return to ancestors until find one with available items.
+		// If reached root.parent, iteration has completed.
+		for {
+			bi.itemIndex = curr.nthChildOfParent()
+			bi.childIndex = bi.itemIndex + 1
+			curr = bi.next.parent
+			if curr == nil {
+				return nil, errors.New("Iterator cannot move forward")
+			}
+			bi.next = curr
+			if bi.itemIndex < len(curr.items) {
+				nextItem := curr.items[bi.itemIndex]
+				bi.itemIndex = 0
+				return nextItem, nil
+			}
+		}
+
+	}
+
+	// 2. At internal node
+	// Follow child index then follow leftmost children until a leaf is
+	// reached.
+	for {
+		curr = curr.children[bi.childIndex]
+		bi.childIndex = 0
+		bi.itemIndex = 0
+		for {
+			if len(curr.children) == 0 {
+				break
+			}
+			curr = curr.children[0]
+		}
+		bi.next = curr
+		nextItem := curr.items[bi.itemIndex]
+		bi.itemIndex++
+		return nextItem, nil
+	}
 }
 
 // split inserts an item into a particular node.
