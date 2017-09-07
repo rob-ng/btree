@@ -9,6 +9,16 @@ import (
 )
 
 //=============================================================================
+//= Variables and Constants
+//=============================================================================
+
+// Direction values for Iterator
+const (
+	forward = 1
+	reverse = -1
+)
+
+//=============================================================================
 //= Types
 //=============================================================================
 
@@ -21,6 +31,16 @@ type BTree struct {
 // An Item is an element which can be compared to another Item.
 type Item interface {
 	Less(other Item) bool
+}
+
+// An Iterator is a stateful iterator for BTrees.
+//
+// Iterators move either in-order or reverse in-order.
+type Iterator struct {
+	itemIndex  int
+	childIndex int
+	dir        int
+	curr       *node
 }
 
 type items []Item
@@ -112,6 +132,92 @@ func (b *BTree) Search(item Item) (*Item, error) {
 // Bulkload initializes a BTree using an array of Items.
 func (b *BTree) Bulkload(items items) {
 
+}
+
+// NewIterator returns a new iterator for the BTree.
+func (b *BTree) NewIterator() *Iterator {
+	return &Iterator{
+		itemIndex:  0,
+		childIndex: 0,
+		curr:       b.root,
+		dir:        forward,
+	}
+}
+
+// NewReverseIterator returns a new reverse iterator for the BTree.
+func (b *BTree) NewReverseIterator() *Iterator {
+	return &Iterator{
+		itemIndex:  len(b.root.items) - 1,
+		childIndex: len(b.root.children) - 1,
+		curr:       b.root,
+		dir:        reverse,
+	}
+}
+
+// HasNext determines if iterator can iterate.
+func (bi *Iterator) HasNext() bool {
+	return bi.curr != nil
+}
+
+// Next iterates the iterator and returns its new value.
+func (bi *Iterator) Next() (Item, error) {
+	if !bi.HasNext() {
+		return nil, errors.New("Iterator does not have next")
+	}
+
+	curr := bi.curr
+	// 1. At leaf node
+	if len(curr.children) == 0 {
+		// A. More items in current node
+		if 0 <= bi.itemIndex && bi.itemIndex < len(curr.items) {
+			nextItem := curr.items[bi.itemIndex]
+			bi.itemIndex += bi.dir
+			return nextItem, nil
+		}
+		// B. No more items
+		for {
+			bi.itemIndex = curr.nthChildOfParent()
+			bi.childIndex = bi.itemIndex + 1
+			if bi.dir == reverse {
+				bi.itemIndex--
+				bi.childIndex = bi.itemIndex
+			}
+			curr = curr.parent
+			if curr == nil {
+				return nil, errors.New("Iterator does not have next")
+			}
+			if 0 <= bi.itemIndex && bi.itemIndex < len(curr.items) {
+				bi.curr = curr
+				nextItem := curr.items[bi.itemIndex]
+				return nextItem, nil
+			}
+
+		}
+
+	}
+
+	// 2. At internal node
+	for {
+		curr = curr.children[bi.childIndex]
+		for {
+			if len(curr.children) == 0 {
+				break
+			}
+			indexToFollow := 0
+			if bi.dir == reverse {
+				indexToFollow += len(curr.children) - 1
+			}
+			curr = curr.children[indexToFollow]
+		}
+		bi.curr = curr
+		bi.itemIndex = 0
+		if bi.dir == reverse {
+			bi.itemIndex += len(curr.items) - 1
+		}
+		nextItem := curr.items[bi.itemIndex]
+		bi.itemIndex += bi.dir
+		return nextItem, nil
+	}
 }
 
 // split inserts an item into a particular node.

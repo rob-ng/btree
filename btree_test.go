@@ -140,8 +140,104 @@ func TestSearch(t *testing.T) {
 
 }
 
+func TestIteratorNext(t *testing.T) {
+	rand.Seed(time.Now().UnixNano())
+	numItems := 1000
+	massItems := make(map[int]*testItem, numItems)
+	for i := 0; i < numItems; i++ {
+		massItems[i] = &testItem{i, i}
+	}
+	cases := []struct {
+		items map[int]*testItem
+		order int
+	}{
+		{items: massItems, order: 3},
+	}
+
+	for _, c := range cases {
+		b := NewBTree(c.order)
+		for _, v := range c.items {
+			b.Insert(v)
+		}
+		iter := b.NewIterator()
+
+		for i := 0; i < len(c.items); i++ {
+			iter.Next()
+		}
+	}
+}
+
+func TestIteratorReverseNext(t *testing.T) {
+	rand.Seed(time.Now().UnixNano())
+	numItems := 1000
+	massItems := make(map[int]*testItem, numItems)
+	for i := 0; i < numItems; i++ {
+		massItems[i] = &testItem{i, i}
+	}
+	cases := []struct {
+		items map[int]*testItem
+		order int
+	}{
+		{items: massItems, order: 3},
+	}
+
+	for _, c := range cases {
+		b := NewBTree(c.order)
+		for _, v := range c.items {
+			b.Insert(v)
+		}
+		iter := b.NewReverseIterator()
+
+		for i := 0; i < len(c.items); i++ {
+			iter.Next()
+		}
+	}
+}
+
 func TestBulkload(t *testing.T) {
 
+}
+
+//=============================================================================
+//= Benchmarks
+//=============================================================================
+
+var bt *BTree
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+	numItems := 10000
+	massItems := make(map[int]*testItem, numItems)
+	for i := 0; i < numItems; i++ {
+		massItems[i] = &testItem{i, i}
+	}
+	bt = NewBTree(20)
+	for _, v := range massItems {
+		bt.Insert(v)
+	}
+}
+
+func BenchmarkIterator(b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		iter := bt.NewIterator()
+		iterateThrough(iter)
+	}
+}
+
+func BenchmarkIteratorReverse(b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		iter := bt.NewReverseIterator()
+		iterateThrough(iter)
+	}
+}
+
+func iterateThrough(iter *Iterator) {
+	for {
+		_, err := iter.Next()
+		if err != nil {
+			return
+		}
+	}
 }
 
 //=============================================================================
