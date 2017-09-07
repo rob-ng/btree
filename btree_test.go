@@ -195,6 +195,29 @@ func TestIteratorReverseNext(t *testing.T) {
 }
 
 func TestBulkload(t *testing.T) {
+	rand.Seed(time.Now().UnixNano())
+	numItems := 1000
+	massItems := make([]Item, numItems)
+	for i := 0; i < numItems; i++ {
+		massItems[i] = &testItem{i, i}
+	}
+	cases := []struct {
+		items []Item
+		order int
+	}{
+		{items: massItems, order: 5},
+		{items: massItems, order: 12},
+		{items: massItems, order: 3},
+	}
+
+	for _, c := range cases {
+		bt := Bulkload(c.order, c.items)
+
+		if !isValidBTree(bt) {
+			walk(bt.root)
+			t.Errorf("Bulkloaded tree is not valid\n")
+		}
+	}
 
 }
 
