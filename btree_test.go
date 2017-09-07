@@ -221,6 +221,38 @@ func TestBulkload(t *testing.T) {
 
 }
 
+func TestMerge(t *testing.T) {
+	rand.Seed(time.Now().UnixNano())
+	numFirst := 5000
+	numSecond := 5000
+	firstItems := make([]Item, numFirst)
+	secondItems := make([]Item, numSecond)
+	for i := 0; i < numFirst; i++ {
+		firstItems[i] = &testItem{i, i}
+	}
+	for i := 0; i < numSecond; i++ {
+		secondItems[i] = &testItem{i + numFirst/2, i + numFirst/2}
+	}
+	cases := []struct {
+		first  []Item
+		second []Item
+		order  int
+	}{
+		{first: firstItems, second: secondItems, order: 5},
+	}
+
+	for _, c := range cases {
+		firstTree := Bulkload(c.order, c.first)
+		secondTree := Bulkload(c.order, c.second)
+
+		mt, err := Merge(firstTree, secondTree)
+		if err != nil || !isValidBTree(mt) {
+			walk(mt.root)
+			t.Errorf("Merged tree should have been valid.")
+		}
+	}
+}
+
 //=============================================================================
 //= Benchmarks
 //=============================================================================
