@@ -32,7 +32,7 @@ func TestInsert(t *testing.T) {
 		{items: dupItems, order: 5},
 	}
 	for _, ti := range insertTests {
-		b := NewBTree(ti.order)
+		b := New(ti.order)
 		i := 0
 		for _, item := range ti.items {
 			b.Insert(item)
@@ -74,7 +74,7 @@ func TestDelete(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		b := NewBTree(c.order)
+		b := New(c.order)
 		for _, v := range c.items {
 			b.Insert(v)
 		}
@@ -123,7 +123,7 @@ func TestSearch(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		b := NewBTree(c.order)
+		b := New(c.order)
 		for _, ti := range c.items {
 			b.Insert(ti)
 		}
@@ -155,7 +155,7 @@ func TestIteratorNext(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		b := NewBTree(c.order)
+		b := New(c.order)
 		for _, v := range c.items {
 			b.Insert(v)
 		}
@@ -182,7 +182,7 @@ func TestIteratorReverseNext(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		b := NewBTree(c.order)
+		b := New(c.order)
 		for _, v := range c.items {
 			b.Insert(v)
 		}
@@ -211,7 +211,7 @@ func init() {
 	for i := 0; i < numItems; i++ {
 		massItems[i] = &testItem{i, i}
 	}
-	bt = NewBTree(20)
+	bt = New(20)
 	for _, v := range massItems {
 		bt.Insert(v)
 	}

@@ -451,8 +451,8 @@ func (n *node) nthChildOfParent() int {
 //= Functions
 //=============================================================================
 
-// NewBTree returns a new BTree.
-func NewBTree(order int) *BTree {
+// New returns a new BTree.
+func New(order int) *BTree {
 	return &BTree{
 		order: order,
 		root:  newNode(order, nil, nil, nil),
