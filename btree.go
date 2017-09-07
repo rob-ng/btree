@@ -129,11 +129,6 @@ func (b *BTree) Search(item Item) (*Item, error) {
 	return &container.items[index], nil
 }
 
-// Bulkload initializes a BTree using an array of Items.
-func (b *BTree) Bulkload(items items) {
-
-}
-
 // NewIterator returns a new iterator for the BTree.
 func (b *BTree) NewIterator() *Iterator {
 	return &Iterator{
@@ -457,6 +452,24 @@ func New(order int) *BTree {
 		order: order,
 		root:  newNode(order, nil, nil, nil),
 	}
+}
+
+// Bulkload initializes a BTree using a sorted array of Items.
+//
+// NOTE: The function is not guaranteed to work for unsorted data or data which
+// contains duplicates. It is the caller's responsibility to ensure that their
+// data is properly formatted.
+func Bulkload(order int, items items) *BTree {
+	b := New(order)
+	max := b.root
+	for i := 0; i < len(items); i++ {
+		b.split(max, items[i])
+		if max.parent != nil && len(max.parent.children) > 0 {
+			max = max.parent.children[len(max.parent.children)-1]
+		}
+
+	}
+	return b
 }
 
 // newNode returns a new node.
