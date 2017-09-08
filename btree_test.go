@@ -144,14 +144,26 @@ func TestIteratorNext(t *testing.T) {
 	rand.Seed(time.Now().UnixNano())
 	numItems := 1000
 	massItems := make(map[int]*testItem, numItems)
+	emptyItems := make(map[int]*testItem)
+	oneItems := make(map[int]*testItem, 1)
 	for i := 0; i < numItems; i++ {
 		massItems[i] = &testItem{i, i}
 	}
+	oneItems[0] = massItems[0]
 	cases := []struct {
 		items map[int]*testItem
 		order int
 	}{
+		// Should work for trees of various orders
 		{items: massItems, order: 3},
+		{items: massItems, order: 8},
+		{items: massItems, order: 15},
+		// Should work for empty trees
+		{items: emptyItems, order: 3},
+		{items: emptyItems, order: 4},
+		// Should work for tree with single item
+		{items: oneItems, order: 3},
+		{items: oneItems, order: 4},
 	}
 
 	for _, c := range cases {
@@ -173,12 +185,14 @@ func TestIteratorNext(t *testing.T) {
 			prev = next
 		}
 
-		if iter.HasNext() {
-			t.Errorf("Iterator should no longer have next")
-		}
-		extraIterVal, err := iter.Next()
-		if extraIterVal != nil || err == nil {
-			t.Errorf("Extra call to Next() should have returned nil value and error. Instead got val: %v, and error: %v", extraIterVal, err)
+		for i := 0; i < len(c.items); i++ {
+			if iter.HasNext() {
+				t.Errorf("Iterator should no longer have next")
+			}
+			extraIterVal, err := iter.Next()
+			if extraIterVal != nil || err == nil {
+				t.Errorf("Extra call to Next() should have returned nil value and error. Instead got val: %v, and error: %v", extraIterVal, err)
+			}
 		}
 	}
 }
@@ -187,14 +201,26 @@ func TestIteratorReverseNext(t *testing.T) {
 	rand.Seed(time.Now().UnixNano())
 	numItems := 1000
 	massItems := make(map[int]*testItem, numItems)
+	emptyItems := make(map[int]*testItem)
+	oneItems := make(map[int]*testItem, 1)
 	for i := 0; i < numItems; i++ {
 		massItems[i] = &testItem{i, i}
 	}
+	oneItems[0] = massItems[0]
 	cases := []struct {
 		items map[int]*testItem
 		order int
 	}{
+		// Should work for trees of various orders
 		{items: massItems, order: 3},
+		{items: massItems, order: 8},
+		{items: massItems, order: 15},
+		// Should work for empty trees
+		{items: emptyItems, order: 3},
+		{items: emptyItems, order: 4},
+		// Should work for tree with single item
+		{items: oneItems, order: 3},
+		{items: oneItems, order: 4},
 	}
 
 	for _, c := range cases {
@@ -203,9 +229,25 @@ func TestIteratorReverseNext(t *testing.T) {
 			b.Insert(v)
 		}
 		iter := b.NewReverseIterator()
-
+		var prev Item
 		for i := 0; i < len(c.items); i++ {
-			iter.Next()
+			next, err := iter.Next()
+			if err != nil {
+				t.Errorf("Call to Next() should not have returned non-nil error")
+			}
+			if prev != nil && !next.Less(prev) {
+				t.Errorf("Values from Iterator should be descending. Prev: %v, Next: %v", prev, next)
+			}
+			prev = next
+		}
+		for i := 0; i < len(c.items); i++ {
+			if iter.HasNext() {
+				t.Errorf("Iterator should no longer have next")
+			}
+			extraIterVal, err := iter.Next()
+			if extraIterVal != nil || err == nil {
+				t.Errorf("Extra call to Next() should have returned nil value and error. Instead got val: %v, and error: %v", extraIterVal, err)
+			}
 		}
 	}
 }
