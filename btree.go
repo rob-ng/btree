@@ -129,6 +129,35 @@ func (b *BTree) Search(item Item) (*Item, error) {
 	return &container.items[index], nil
 }
 
+// Print prints a horizontal representation of the BTree.
+func (b *BTree) print() {
+	print(b.root, "", true)
+}
+
+func print(n *node, prefix string, isTail bool) {
+	split, tail, vert, gap := "├──", "└──", "│   ", "    "
+	if isTail {
+		fmt.Printf("%s%v\n", prefix+tail, n.items)
+	} else {
+		fmt.Printf("%s%v\n", prefix+split, n.items)
+	}
+	var i int
+	for i = 0; i < len(n.children)-1; i++ {
+		if isTail {
+			print(n.children[i], prefix+gap, false)
+		} else {
+			print(n.children[i], prefix+vert, false)
+		}
+	}
+	if len(n.children) > 0 {
+		if isTail {
+			print(n.children[i], prefix+gap, true)
+		} else {
+			print(n.children[i], prefix+vert, true)
+		}
+	}
+}
+
 // NewIterator returns a new iterator for the BTree.
 func (b *BTree) NewIterator() *Iterator {
 	curr := b.min(b.root)
@@ -530,7 +559,7 @@ func newNode(order int, i items, c children, parent *node) *node {
 	}
 }
 
-type walker struct {
+/*type walker struct {
 	n      *node
 	height int
 }
@@ -567,4 +596,4 @@ func walk(root *node) {
 		}
 	}
 	fmt.Printf("total nodes: %d\n", total)
-}
+}*/

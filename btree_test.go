@@ -11,6 +11,15 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
+func TestPrint(t *testing.T) {
+	massItems := uniqueInputsN(500)
+	b := New(5)
+	for _, item := range massItems {
+		b.Insert(item)
+	}
+	b.Print()
+}
+
 func TestInsert(t *testing.T) {
 	massItems := uniqueInputsN(1000)
 	dupItems := duplicateInputsN(1000)
