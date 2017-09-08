@@ -131,20 +131,22 @@ func (b *BTree) Search(item Item) (*Item, error) {
 
 // NewIterator returns a new iterator for the BTree.
 func (b *BTree) NewIterator() *Iterator {
+	curr := b.min(b.root)
 	return &Iterator{
 		itemIndex:  0,
 		childIndex: 0,
-		curr:       b.root,
+		curr:       curr,
 		dir:        forward,
 	}
 }
 
 // NewReverseIterator returns a new reverse iterator for the BTree.
 func (b *BTree) NewReverseIterator() *Iterator {
+	curr := b.max(b.root)
 	return &Iterator{
-		itemIndex:  len(b.root.items) - 1,
-		childIndex: len(b.root.children) - 1,
-		curr:       b.root,
+		itemIndex:  len(curr.items) - 1,
+		childIndex: len(curr.children) - 1,
+		curr:       curr,
 		dir:        reverse,
 	}
 }
@@ -154,23 +156,19 @@ func (bi *Iterator) HasNext() bool {
 	return bi.curr != nil
 }
 
-// Next iterates the iterator and returns its new value.
-//
-// BUG: The call to Next() which should set bi.curr = nil (so that subsequent
-// HasNext() will be false) doesn't appear to be working. Error gets returned
-// but curr isn't set.
+// Next moves the iterator forward and returns its previous value.
 func (bi *Iterator) Next() (Item, error) {
 	if !bi.HasNext() {
 		return nil, errors.New("Iterator does not have next")
 	}
 
 	curr := bi.curr
+	nextItem := curr.items[bi.itemIndex]
 	// 1. At leaf node
 	if len(curr.children) == 0 {
+		bi.itemIndex += bi.dir
 		// A. More items in current node
 		if 0 <= bi.itemIndex && bi.itemIndex < len(curr.items) {
-			nextItem := curr.items[bi.itemIndex]
-			bi.itemIndex += bi.dir
 			return nextItem, nil
 		}
 		// B. No more items
@@ -184,11 +182,10 @@ func (bi *Iterator) Next() (Item, error) {
 			curr = curr.parent
 			if curr == nil {
 				bi.curr = curr
-				return nil, errors.New("Iterator does not have next")
+				return nextItem, nil
 			}
 			if 0 <= bi.itemIndex && bi.itemIndex < len(curr.items) {
 				bi.curr = curr
-				nextItem := curr.items[bi.itemIndex]
 				return nextItem, nil
 			}
 
@@ -214,8 +211,6 @@ func (bi *Iterator) Next() (Item, error) {
 		if bi.dir == reverse {
 			bi.itemIndex += len(curr.items) - 1
 		}
-		nextItem := curr.items[bi.itemIndex]
-		bi.itemIndex += bi.dir
 		return nextItem, nil
 	}
 }
@@ -370,6 +365,17 @@ func (b *BTree) max(root *node) *node {
 			return curr
 		}
 		curr = curr.children[len(curr.children)-1]
+	}
+}
+
+// min returns the leftmost node of a particular subtree.
+func (b *BTree) min(root *node) *node {
+	curr := root
+	for {
+		if len(curr.children) == 0 {
+			return curr
+		}
+		curr = curr.children[0]
 	}
 }
 
