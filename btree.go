@@ -379,6 +379,13 @@ func (b *BTree) min(root *node) *node {
 	}
 }
 
+// print prints a horizontal representation of the BTree.
+//
+// NOTE: Intended primarily for testing.
+func (b *BTree) print() {
+	print(b.root, "", true)
+}
+
 // find returns the index of the item in items.
 // If item does not exist in items, return where it would be located
 // (where 0 <= index <= len(array)).
@@ -530,41 +537,27 @@ func newNode(order int, i items, c children, parent *node) *node {
 	}
 }
 
-type walker struct {
-	n      *node
-	height int
-}
-
-// walk prints a representation of the BTree in level order.
-// Exists for testing purposes.
-func walk(root *node) {
-	total := 0
-	q := []walker{{root, 0}}
-	if len(q) > 0 {
-		total += len(root.items)
+// print recursively prints a horizontal representation of the BTree.
+func print(n *node, prefix string, isTail bool) {
+	split, tail, vert, gap := "├──", "└──", "│   ", "    "
+	if isTail {
+		fmt.Printf("%s%v\n", prefix+tail, n.items)
+	} else {
+		fmt.Printf("%s%v\n", prefix+split, n.items)
 	}
-	currHeight := 0
-	var currParent *node
-	for len(q) > 0 {
-		curr := q[0]
-		if curr.height != currHeight {
-			fmt.Println()
-			fmt.Println()
-			currHeight = curr.height
-		}
-		if curr.n.parent != currParent {
-			fmt.Printf("\n| ")
-			currParent = curr.n.parent
-		}
-		fmt.Printf("(s: %p, p: %p, v: %v, nc: %d) ", curr.n, curr.n.parent, curr.n.items, len(curr.n.children))
-		q = q[1:]
-		for _, c := range curr.n.children {
-			if c != nil {
-				w := walker{c, curr.height + 1}
-				q = append(q, w)
-				total += len(c.items)
-			}
+	var i int
+	for i = 0; i < len(n.children)-1; i++ {
+		if isTail {
+			print(n.children[i], prefix+gap, false)
+		} else {
+			print(n.children[i], prefix+vert, false)
 		}
 	}
-	fmt.Printf("total nodes: %d\n", total)
+	if len(n.children) > 0 {
+		if isTail {
+			print(n.children[i], prefix+gap, true)
+		} else {
+			print(n.children[i], prefix+vert, true)
+		}
+	}
 }

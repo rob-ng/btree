@@ -35,7 +35,7 @@ func TestInsert(t *testing.T) {
 			b.Insert(item)
 
 			if !isValidBTree(b) {
-				walk(b.root)
+				b.print()
 				t.Fatalf("After Insert: BTree is not valid after %dth insert of item %v\n", i+1, item)
 			}
 		}
@@ -84,7 +84,7 @@ func TestDelete(t *testing.T) {
 			}
 
 			if !isValidBTree(b) {
-				walk(b.root)
+				b.print()
 				t.Fatalf("After Delete: BTree is not valid after %dth deletion. Item was %v\n", i, c.toDelete)
 			}
 		}
@@ -252,7 +252,7 @@ func TestBulkload(t *testing.T) {
 		bt := Bulkload(c.order, c.items)
 
 		if !isValidBTree(bt) {
-			walk(bt.root)
+			bt.print()
 			t.Errorf("Bulkloaded tree is not valid\n")
 		}
 	}
@@ -289,7 +289,7 @@ func TestMerge(t *testing.T) {
 
 		mt, err := Merge(firstTree, secondTree)
 		if err != nil || !isValidBTree(mt) {
-			walk(mt.root)
+			mt.print()
 			t.Errorf("Merged tree should have been valid")
 		}
 	}
