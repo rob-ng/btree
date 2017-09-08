@@ -161,8 +161,24 @@ func TestIteratorNext(t *testing.T) {
 		}
 		iter := b.NewIterator()
 
+		var prev Item
 		for i := 0; i < len(c.items); i++ {
-			iter.Next()
+			next, err := iter.Next()
+			if err != nil {
+				t.Errorf("Call to Next() should not have returned non-nil error")
+			}
+			if prev != nil && !prev.Less(next) {
+				t.Errorf("Values from Iterator should be ascending. Prev: %v, Next: %v", prev, next)
+			}
+			prev = next
+		}
+
+		if iter.HasNext() {
+			t.Errorf("Iterator should no longer have next")
+		}
+		extraIterVal, err := iter.Next()
+		if extraIterVal != nil || err == nil {
+			t.Errorf("Extra call to Next() should have returned nil value and error. Instead got val: %v, and error: %v", extraIterVal, err)
 		}
 	}
 }
