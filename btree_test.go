@@ -7,17 +7,15 @@ import (
 	"time"
 )
 
-func TestInsert(t *testing.T) {
+func init() {
 	rand.Seed(time.Now().UnixNano())
-	numItems := 1000
-	massItems := make(map[int]*testItem, numItems)
-	dupItems := make(map[int]*testItem, numItems)
-	for i := 0; i < numItems; i++ {
-		massItems[i] = &testItem{i, i}
-		dupItems[i] = massItems[0]
-	}
+}
+
+func TestInsert(t *testing.T) {
+	massItems := uniqueInputsN(1000)
+	dupItems := duplicateInputsN(1000)
 	insertTests := []struct {
-		items map[int]*testItem
+		items []Item
 		order int
 	}{
 		// Many random unique items
@@ -33,10 +31,8 @@ func TestInsert(t *testing.T) {
 	}
 	for _, ti := range insertTests {
 		b := New(ti.order)
-		i := 0
-		for _, item := range ti.items {
+		for i, item := range ti.items {
 			b.Insert(item)
-			i++
 
 			if !isValidBTree(b) {
 				walk(b.root)
@@ -47,30 +43,27 @@ func TestInsert(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	rand.Seed(time.Now().UnixNano())
-	numItems := 1000
-	massItems := make(map[int]*testItem, numItems)
-	for i := 0; i < numItems; i++ {
-		massItems[i] = &testItem{i, i}
-	}
-	emptyItems := make(map[int]*testItem)
-	dneItems := map[int]*testItem{0: &testItem{key: -999, val: 0}}
+	massItems := uniqueInputsN(1000)
+	emptyItems := uniqueInputsN(0)
+	dneItems := []Item{&testItem{key: -999, val: 0}}
 	cases := []struct {
-		items           map[int]*testItem
+		items           []Item
+		toDelete        []Item
 		order           int
-		toDelete        map[int]*testItem
 		shouldAlterTree bool
 	}{
 		// Delete should work on empty tree
-		{items: emptyItems, order: 5, toDelete: emptyItems, shouldAlterTree: false},
-		{items: emptyItems, order: 3, toDelete: emptyItems, shouldAlterTree: false},
+		{items: emptyItems, toDelete: massItems, order: 3, shouldAlterTree: false},
+		{items: emptyItems, toDelete: massItems, order: 6, shouldAlterTree: false},
 		// Delete should work for item not in tree
-		{items: massItems, order: 3, toDelete: dneItems, shouldAlterTree: false},
-		// Should fully delete trees of various orders
-		{items: massItems, order: 30, toDelete: massItems, shouldAlterTree: true},
-		{items: massItems, order: 8, toDelete: massItems, shouldAlterTree: true},
-		{items: massItems, order: 5, toDelete: massItems, shouldAlterTree: true},
-		{items: massItems, order: 3, toDelete: massItems, shouldAlterTree: true},
+		{items: massItems, toDelete: dneItems, order: 3, shouldAlterTree: false},
+		{items: massItems, toDelete: dneItems, order: 6, shouldAlterTree: false},
+		// Delete should be able to fully delete trees of various
+		// orders
+		{items: massItems, toDelete: massItems, order: 3, shouldAlterTree: false},
+		{items: massItems, toDelete: massItems, order: 6, shouldAlterTree: false},
+		{items: massItems, toDelete: massItems, order: 18, shouldAlterTree: false},
+		{items: massItems, toDelete: massItems, order: 30, shouldAlterTree: false},
 	}
 
 	for _, c := range cases {
@@ -85,7 +78,7 @@ func TestDelete(t *testing.T) {
 
 			if c.shouldAlterTree {
 				_, presentAfter := b.Search(d)
-				if presentBefore == presentAfter {
+				if presentBefore != nil || presentAfter == nil {
 					t.Errorf("Item should have been deleted from tree\n")
 				}
 			}
@@ -100,26 +93,25 @@ func TestDelete(t *testing.T) {
 }
 
 func TestSearch(t *testing.T) {
-	rand.Seed(time.Now().UnixNano())
-	numItems := 1000
-	massItems := make(map[int]*testItem, numItems)
-	for i := 0; i < numItems; i++ {
-		massItems[i] = &testItem{i, i}
-	}
+	massItems := uniqueInputsN(1000)
+	emptyItems := uniqueInputsN(0)
+	dneItems := []Item{&testItem{key: -999, val: 0}}
 	cases := []struct {
-		items      map[int]*testItem
+		items      []Item
 		order      int
-		lookFor    []*testItem
+		lookFor    []Item
 		shouldFind bool
 	}{
 		// Should be able to search empty tree
-		{items: map[int]*testItem{}, order: 4, lookFor: []*testItem{massItems[0]}, shouldFind: false},
-		// Should successfully find present node with particular order
-		{items: massItems, order: 5, lookFor: []*testItem{massItems[1], massItems[2], massItems[3]}, shouldFind: true},
-		// Should successfully find present node with different order
-		{items: massItems, order: 11, lookFor: []*testItem{massItems[1], massItems[2], massItems[3]}, shouldFind: true},
-		// Should successfully not find missing node
-		{items: massItems, order: 2, lookFor: []*testItem{{key: -9999, val: 0}}, shouldFind: false},
+		{items: emptyItems, order: 4, lookFor: massItems[0:2], shouldFind: false},
+		// Should successfully not find missing items
+		{items: massItems, order: 3, lookFor: dneItems, shouldFind: false},
+		{items: massItems, order: 6, lookFor: dneItems, shouldFind: false},
+		{items: massItems, order: 11, lookFor: dneItems, shouldFind: false},
+		// Should successfully find items
+		{items: massItems, order: 3, lookFor: massItems, shouldFind: true},
+		{items: massItems, order: 6, lookFor: massItems, shouldFind: true},
+		{items: massItems, order: 11, lookFor: massItems, shouldFind: true},
 	}
 
 	for _, c := range cases {
@@ -129,29 +121,22 @@ func TestSearch(t *testing.T) {
 		}
 
 		for _, target := range c.lookFor {
-			_, err := b.Search(target)
-			if err != nil && c.shouldFind == true {
+			res, err := b.Search(target)
+			if (res == nil || err != nil) && c.shouldFind == true {
 				t.Errorf("Should have found: %v\n", target)
-			} else if err == nil && c.shouldFind == false {
+			} else if (res != nil || err == nil) && c.shouldFind == false {
 				t.Errorf("Should not have found: %v\n", target)
 			}
 		}
 	}
-
 }
 
 func TestIteratorNext(t *testing.T) {
-	rand.Seed(time.Now().UnixNano())
-	numItems := 1000
-	massItems := make(map[int]*testItem, numItems)
-	emptyItems := make(map[int]*testItem)
-	oneItems := make(map[int]*testItem, 1)
-	for i := 0; i < numItems; i++ {
-		massItems[i] = &testItem{i, i}
-	}
-	oneItems[0] = massItems[0]
+	massItems := uniqueInputsN(1000)
+	oneItems := uniqueInputsN(1)
+	emptyItems := uniqueInputsN(0)
 	cases := []struct {
-		items map[int]*testItem
+		items []Item
 		order int
 	}{
 		// Should work for trees of various orders
@@ -171,44 +156,40 @@ func TestIteratorNext(t *testing.T) {
 		for _, v := range c.items {
 			b.Insert(v)
 		}
+
 		iter := b.NewIterator()
 
 		var prev Item
 		for i := 0; i < len(c.items); i++ {
 			next, err := iter.Next()
 			if err != nil {
-				t.Errorf("Call to Next() should not have returned non-nil error")
+				t.Fatalf("Call to Next() should not have returned non-nil error")
 			}
 			if prev != nil && !prev.Less(next) {
-				t.Errorf("Values from Iterator should be ascending. Prev: %v, Next: %v", prev, next)
+				t.Fatalf("Values from Iterator should be ascending. Prev: %v, Next: %v", prev, next)
 			}
 			prev = next
 		}
 
 		for i := 0; i < len(c.items); i++ {
 			if iter.HasNext() {
-				t.Errorf("Iterator should no longer have next")
+				t.Fatalf("Iterator should no longer have next")
 			}
 			extraIterVal, err := iter.Next()
 			if extraIterVal != nil || err == nil {
-				t.Errorf("Extra call to Next() should have returned nil value and error. Instead got val: %v, and error: %v", extraIterVal, err)
+				t.Fatalf("Extra call to Next() should have returned nil value and error."+
+					"Instead got val: %v, and error: %v", extraIterVal, err)
 			}
 		}
 	}
 }
 
 func TestIteratorReverseNext(t *testing.T) {
-	rand.Seed(time.Now().UnixNano())
-	numItems := 1000
-	massItems := make(map[int]*testItem, numItems)
-	emptyItems := make(map[int]*testItem)
-	oneItems := make(map[int]*testItem, 1)
-	for i := 0; i < numItems; i++ {
-		massItems[i] = &testItem{i, i}
-	}
-	oneItems[0] = massItems[0]
+	massItems := uniqueInputsN(1000)
+	oneItems := uniqueInputsN(1)
+	emptyItems := uniqueInputsN(0)
 	cases := []struct {
-		items map[int]*testItem
+		items []Item
 		order int
 	}{
 		// Should work for trees of various orders
@@ -228,7 +209,9 @@ func TestIteratorReverseNext(t *testing.T) {
 		for _, v := range c.items {
 			b.Insert(v)
 		}
+
 		iter := b.NewReverseIterator()
+
 		var prev Item
 		for i := 0; i < len(c.items); i++ {
 			next, err := iter.Next()
@@ -246,26 +229,23 @@ func TestIteratorReverseNext(t *testing.T) {
 			}
 			extraIterVal, err := iter.Next()
 			if extraIterVal != nil || err == nil {
-				t.Errorf("Extra call to Next() should have returned nil value and error. Instead got val: %v, and error: %v", extraIterVal, err)
+				t.Errorf("Extra call to Next() should have returned nil value and error."+
+					"Instead got val: %v, and error: %v", extraIterVal, err)
 			}
 		}
 	}
 }
 
 func TestBulkload(t *testing.T) {
-	rand.Seed(time.Now().UnixNano())
-	numItems := 1000
-	massItems := make([]Item, numItems)
-	for i := 0; i < numItems; i++ {
-		massItems[i] = &testItem{i, i}
-	}
+	massItems := uniqueInputsN(1000)
 	cases := []struct {
 		items []Item
 		order int
 	}{
-		{items: massItems, order: 5},
-		{items: massItems, order: 12},
 		{items: massItems, order: 3},
+		{items: massItems, order: 8},
+		{items: massItems, order: 50},
+		{items: massItems, order: 121},
 	}
 
 	for _, c := range cases {
@@ -276,27 +256,31 @@ func TestBulkload(t *testing.T) {
 			t.Errorf("Bulkloaded tree is not valid\n")
 		}
 	}
-
 }
 
 func TestMerge(t *testing.T) {
-	rand.Seed(time.Now().UnixNano())
-	numFirst := 5000
-	numSecond := 5000
-	firstItems := make([]Item, numFirst)
-	secondItems := make([]Item, numSecond)
-	for i := 0; i < numFirst; i++ {
-		firstItems[i] = &testItem{i, i}
-	}
-	for i := 0; i < numSecond; i++ {
-		secondItems[i] = &testItem{i + numFirst/2, i + numFirst/2}
-	}
+	first := uniqueInputsN(2000)
+	distinct := uniqueInputsN(2000)
+	diffSize := uniqueInputsN(100)
+	overlapsFirst := duplicateInputsN(5000)
+	empty := uniqueInputsN(0)
 	cases := []struct {
 		first  []Item
 		second []Item
 		order  int
 	}{
-		{first: firstItems, second: secondItems, order: 5},
+		// Should successfully merge with empty tree
+		{first: first, second: empty, order: 6},
+		{first: empty, second: first, order: 6},
+		// Should successfully merge with distinct other tree
+		{first: first, second: distinct, order: 3},
+		{first: distinct, second: first, order: 3},
+		// Should successfully merge with other tree with equal items
+		{first: first, second: overlapsFirst, order: 5},
+		{first: overlapsFirst, second: first, order: 5},
+		// Should successfully merge with tree of different size
+		{first: first, second: diffSize, order: 12},
+		{first: diffSize, second: first, order: 12},
 	}
 
 	for _, c := range cases {
@@ -306,7 +290,7 @@ func TestMerge(t *testing.T) {
 		mt, err := Merge(firstTree, secondTree)
 		if err != nil || !isValidBTree(mt) {
 			walk(mt.root)
-			t.Errorf("Merged tree should have been valid.")
+			t.Errorf("Merged tree should have been valid")
 		}
 	}
 }
@@ -315,29 +299,20 @@ func TestMerge(t *testing.T) {
 //= Benchmarks
 //=============================================================================
 
-var bt *BTree
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
-	numItems := 10000
-	massItems := make(map[int]*testItem, numItems)
-	for i := 0; i < numItems; i++ {
-		massItems[i] = &testItem{i, i}
-	}
-	bt = New(20)
-	for _, v := range massItems {
-		bt.Insert(v)
-	}
-}
-
-func BenchmarkIterator(b *testing.B) {
+func benchmarkIterator(size, order int, b *testing.B) {
+	massItems := uniqueInputsN(size)
+	bt := Bulkload(order, massItems)
+	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		iter := bt.NewIterator()
 		iterateThrough(iter)
 	}
 }
 
-func BenchmarkIteratorReverse(b *testing.B) {
+func benchmarkIteratorReverse(size, order int, b *testing.B) {
+	massItems := uniqueInputsN(size)
+	bt := Bulkload(order, massItems)
+	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		iter := bt.NewReverseIterator()
 		iterateThrough(iter)
@@ -345,13 +320,22 @@ func BenchmarkIteratorReverse(b *testing.B) {
 }
 
 func iterateThrough(iter *Iterator) {
-	for {
-		_, err := iter.Next()
-		if err != nil {
-			return
-		}
+	for iter.HasNext() {
+		iter.Next()
 	}
 }
+
+func BenchmarkIterator10(b *testing.B)     { benchmarkIterator(10, 3, b) }
+func BenchmarkIterator100(b *testing.B)    { benchmarkIterator(100, 3, b) }
+func BenchmarkIterator1000(b *testing.B)   { benchmarkIterator(1000, 3, b) }
+func BenchmarkIterator10000(b *testing.B)  { benchmarkIterator(10000, 3, b) }
+func BenchmarkIterator100000(b *testing.B) { benchmarkIterator(100000, 3, b) }
+
+func BenchmarkIteratorReverse10(b *testing.B)     { benchmarkIteratorReverse(10, 3, b) }
+func BenchmarkIteratorReverse100(b *testing.B)    { benchmarkIteratorReverse(100, 3, b) }
+func BenchmarkIteratorReverse1000(b *testing.B)   { benchmarkIteratorReverse(1000, 3, b) }
+func BenchmarkIteratorReverse10000(b *testing.B)  { benchmarkIteratorReverse(10000, 3, b) }
+func BenchmarkIteratorReverse100000(b *testing.B) { benchmarkIteratorReverse(100000, 3, b) }
 
 //=============================================================================
 //= Helpers
@@ -371,6 +355,29 @@ func (ti *testItem) Less(other Item) bool {
 
 func (ti *testItem) String() string {
 	return fmt.Sprintf("(k: %d, v: %d),", ti.key, ti.val)
+}
+
+// Return slice of *testItems with key/val between 0 and n.
+// Values will be randomly ordered, as ranging over maps is random.
+func uniqueInputsN(n int) []Item {
+	numItems := n
+	itemsMap := make(map[int]*testItem, n)
+	for i := 0; i < numItems; i++ {
+		itemsMap[i] = &testItem{i, i}
+	}
+	itemSlice := make([]Item, n)
+	for i, v := range itemsMap {
+		itemSlice[i] = v
+	}
+	return itemSlice
+}
+
+func duplicateInputsN(n int) []Item {
+	itemSlice := uniqueInputsN(n)
+	for i := n / 2; i < n/2; i++ {
+		itemSlice[i] = itemSlice[0]
+	}
+	return itemSlice
 }
 
 // atMostChildren recursively checks that very node in a BTree has at most

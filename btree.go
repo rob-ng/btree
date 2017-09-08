@@ -153,7 +153,7 @@ func (b *BTree) NewReverseIterator() *Iterator {
 
 // HasNext determines if iterator can iterate.
 func (bi *Iterator) HasNext() bool {
-	return bi.curr != nil
+	return bi.curr != nil && len(bi.curr.items) != 0
 }
 
 // Next moves the iterator forward and returns its previous value.
